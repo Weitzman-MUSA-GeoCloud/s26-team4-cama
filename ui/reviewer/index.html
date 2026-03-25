@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tax Assessor Review — City of Philadelphia OPA</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ---- App shell ---- */
+    .app-shell {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .content-area {
+      display: grid;
+      grid-template-columns: 272px 1fr 330px;
+      overflow: hidden;
+    }
+
+    /* ---- Sidebar ---- */
+    .sidebar {
+      background: white;
+      border-right: 1px solid var(--phila-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-head {
+      background: var(--phila-blue);
+      color: white;
+      padding: 0.6rem 1rem;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-body {
+      padding: 0.9rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    /* ---- Map area ---- */
+    .map-area {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .map-toolbar {
+      background: var(--phila-dark-blue);
+      color: white;
+      padding: 0.38rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .map-toolbar-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .map-toolbar-btn {
+      padding: 0.2rem 0.6rem;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 3px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .map-toolbar-btn:hover { background: rgba(255,255,255,0.28); }
+
+    #map { flex: 1; }
+
+    /* ---- Legend ---- */
+    .map-legend {
+      position: absolute;
+      bottom: 30px;
+      left: 10px;
+      background: white;
+      border-radius: 5px;
+      padding: 0.5rem 0.75rem;
+      box-shadow: var(--phila-shadow);
+      font-size: 11px;
+      z-index: 500;
+      min-width: 130px;
+    }
+
+    .map-legend-title {
+      font-weight: 700;
+      color: var(--phila-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 0.4rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 2px solid white;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+    }
+
+    /* ---- Results panel ---- */
+    .results-panel {
+      background: white;
+      border-left: 1px solid var(--phila-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .stats-bar {
+      background: var(--phila-dark-blue);
+      color: white;
+      display: flex;
+      gap: 0;
+      flex-shrink: 0;
+    }
+
+    .stat-cell {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .stat-cell:last-child { border-right: none; }
+
+    .stat-cell .stat-label { font-size: 10px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.4px; }
+    .stat-cell .stat-value { font-size: 18px; font-weight: 700; color: white; line-height: 1.2; }
+    .stat-cell .stat-value.warn { color: var(--phila-gold); }
+
+    /* ---- Tabs ---- */
+    .result-tabs {
+      display: flex;
+      border-bottom: 2px solid var(--phila-border);
+      flex-shrink: 0;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 0.55rem 0.5rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      cursor: pointer;
+      color: var(--phila-text-muted);
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .tab-btn.active { color: var(--phila-blue); border-bottom-color: var(--phila-blue); }
+
+    .tab-pane { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
+    .tab-pane.active { display: flex; }
+
+    /* ---- Property list ---- */
+    .prop-list { list-style: none; }
+
+    .prop-item {
+      padding: 0.65rem 0.9rem;
+      border-bottom: 1px solid var(--phila-border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .prop-item:hover { background: var(--phila-sky); }
+
+    .prop-item.selected {
+      background: var(--phila-hover);
+      border-left: 3px solid var(--phila-blue);
+      padding-left: calc(0.9rem - 3px);
+    }
+
+    .prop-addr {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--phila-blue);
+    }
+
+    .prop-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--phila-text-muted);
+      margin-top: 2px;
+    }
+
+    .prop-tags {
+      display: flex;
+      gap: 0.25rem;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+
+    /* ---- Detail view ---- */
+    .detail-section {
+      padding: 0.7rem 0.9rem;
+      border-bottom: 1px solid var(--phila-border);
+    }
+
+    .detail-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--phila-text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.2rem 0;
+      font-size: 13px;
+    }
+
+    .detail-row .dl { color: var(--phila-text-muted); }
+    .detail-row .dv { font-weight: 600; }
+
+    /* ---- Empty state ---- */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0.5rem;
+      color: var(--phila-text-muted);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .empty-state svg { opacity: 0.25; }
+
+    /* ---- Notes tab ---- */
+    .notes-body { padding: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem; }
+    .notes-body textarea { height: 110px; resize: vertical; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- HEADER -->
+    <header class="phila-header">
+      <div class="phila-header-top">
+        <span>An Official Website of the City of Philadelphia</span>
+      </div>
+      <div class="phila-header-main">
+        <a href="../index.html" class="phila-logo">
+          <div class="phila-logo-seal">OPA</div>
+          <div>
+            <span class="phila-logo-city">City of Philadelphia</span>
+            <span class="phila-logo-dept">Office of Property Assessment</span>
+          </div>
+        </a>
+        <div class="header-title-block">
+          <div class="header-title-main">Tax Assessor Review Interface</div>
+          <div class="header-title-sub">CAMA System · Assessment Year 2025</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="content-area">
+
+      <!-- LEFT SIDEBAR: Filters -->
+      <aside class="sidebar">
+        <div class="sidebar-head">Search &amp; Filters</div>
+        <div class="sidebar-body">
+
+          <div class="form-group">
+            <label>Address Search</label>
+            <div class="search-bar">
+              <input type="search" id="addressSearch" placeholder="e.g. 1234 Market St" />
+              <button type="button" class="btn btn-primary btn-sm" onclick="searchAddress()">Go</button>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="form-group">
+            <label>Neighborhood</label>
+            <select id="filterNeighborhood" title="Filter by neighborhood">
+              <option value="">All Neighborhoods</option>
+              <option>Center City</option>
+              <option>Fishtown</option>
+              <option>Northern Liberties</option>
+              <option>Kensington</option>
+              <option>West Philadelphia</option>
+              <option>South Philadelphia</option>
+              <option>Germantown</option>
+              <option>Chestnut Hill</option>
+              <option>Roxborough</option>
+              <option>Manayunk</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Property Type</label>
+            <select id="filterType" title="Filter by property type">
+              <option value="">All Types</option>
+              <option>Residential (Single Family)</option>
+              <option>Residential (Multi-Family)</option>
+              <option>Commercial</option>
+              <option>Industrial</option>
+              <option>Vacant Land</option>
+              <option>Mixed Use</option>
+              <option>Tax Exempt</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Assessed Value Range</label>
+            <div class="two-col-grid">
+              <input type="number" id="valMin" placeholder="Min $" />
+              <input type="number" id="valMax" placeholder="Max $" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Review Status</label>
+            <select id="filterStatus" title="Filter by review status">
+              <option value="">All Statuses</option>
+              <option>Pending Review</option>
+              <option>Under Appeal</option>
+              <option>Reviewed</option>
+              <option>Flagged</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Min Change Threshold (%)</label>
+            <input type="number" id="changeThreshold" placeholder="e.g. 15 for &gt;15% change" />
+          </div>
+
+          <div class="divider"></div>
+
+          <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
+          <button type="button" class="btn btn-secondary w-100 mt-1" onclick="resetFilters()">Reset All</button>
+
+          <div class="divider"></div>
+
+          <div class="form-group">
+            <label>Map Symbology</label>
+            <select id="mapOverlay" title="Map symbology mode" onchange="updateMapOverlay(this.value)">
+              <option value="status">Color by Review Status</option>
+              <option value="change">Color by Value Change</option>
+              <option value="type">Color by Property Type</option>
+            </select>
+          </div>
+
+        </div>
+      </aside>
+
+      <!-- CENTER: Map -->
+      <div class="map-area">
+        <div class="map-toolbar">
+          <span>Showing <strong id="mapCount">8</strong> properties</span>
+          <span class="toolbar-sep">|</span>
+          <span id="mapCenter">Philadelphia, PA</span>
+          <div class="map-toolbar-actions">
+            <button type="button" class="map-toolbar-btn" onclick="fitAllMarkers()">Fit All</button>
+            <button type="button" class="map-toolbar-btn" onclick="locateUser()">My Location</button>
+          </div>
+        </div>
+
+        <div id="map"></div>
+
+        <!-- Legend -->
+        <div class="map-legend" id="mapLegend"></div>
+      </div>
+
+      <!-- RIGHT PANEL: Results -->
+      <div class="results-panel">
+
+        <!-- Stats bar -->
+        <div class="stats-bar">
+          <div class="stat-cell">
+            <div class="stat-label">Properties</div>
+            <div class="stat-value" id="statCount">8</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Avg Value</div>
+            <div class="stat-value" id="statAvg">—</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-label">Flagged</div>
+            <div class="stat-value warn" id="statFlagged">—</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="result-tabs">
+          <button type="button" class="tab-btn active" onclick="switchTab('list', this)">List</button>
+          <button type="button" class="tab-btn" onclick="switchTab('detail', this)">Detail</button>
+          <button type="button" class="tab-btn" onclick="switchTab('notes', this)">Notes</button>
+        </div>
+
+        <!-- List pane -->
+        <div id="pane-list" class="tab-pane active">
+          <ul class="prop-list" id="propList"></ul>
+        </div>
+
+        <!-- Detail pane -->
+        <div id="pane-detail" class="tab-pane">
+          <div id="detailContent">
+            <div class="empty-state">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+                <polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              <span class="text-sm">Select a property to view details</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes pane -->
+        <div id="pane-notes" class="tab-pane">
+          <div class="notes-body">
+            <div class="form-group">
+              <label>Selected Property</label>
+              <div id="notePropLabel" class="note-prop-label">
+                No property selected
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Assessor Notes</label>
+              <textarea id="assessorNotes" placeholder="Enter review notes for the selected property..."></textarea>
+            </div>
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary btn-sm" onclick="saveNote()">Save Note</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clearNote()">Clear</button>
+            </div>
+            <div class="divider"></div>
+            <div class="form-group">
+              <label>Recommended Action</label>
+              <select id="recommendedAction" title="Recommended action for this property">
+                <option value="">— No Action —</option>
+                <option>Approve Assessment</option>
+                <option>Adjust Upward</option>
+                <option>Adjust Downward</option>
+                <option>Flag for Field Inspection</option>
+                <option>Escalate to Supervisor</option>
+              </select>
+            </div>
+            <button type="button" class="btn btn-gold w-100" onclick="submitReview()">Submit Review</button>
+          </div>
+        </div>
+
+      </div><!-- /results-panel -->
+    </div><!-- /content-area -->
+  </div><!-- /app-shell -->
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/script.js"></script>
+</body>
+</html>
