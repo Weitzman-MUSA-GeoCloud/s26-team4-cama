@@ -1,14 +1,22 @@
+first run:
+
 gcloud functions deploy extract_phl_opa_properties \
 --gen2 \
 --region=us-central1 \
 --runtime=python312 \
 --source=. \
 --entry-point=extract_phl_opa_properties \
---service-account=musa5090s26-team4@appspot.gserviceaccount.com \
+--service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com \
 --memory=4Gi \
 --timeout=240s \
---set-env-vars=DATA_LAKE_BUCKET=musa5090s25-team4-raw_data \
+--set-env-vars=DATA_LAKE_BUCKET=musa5090s26-team4-raw_data \
 --trigger-http \
 --no-allow-unauthenticated
+
+Single line version:
+
+gcloud functions deploy extract_phl_opa_properties --gen2 --region=us-central1 --runtime=python312 --source=. --entry-point=extract_phl_opa_properties --service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com --memory=4Gi --timeout=240s --set-env-vars=DATA_LAKE_BUCKET=musa5090s26-team4-raw_data --trigger-http --no-allow-unauthenticated
+
+then run:
 
 gcloud functions call extract_phl_opa_properties

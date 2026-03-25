@@ -1,6 +1,3 @@
-from dotenv import load_dotenv
-load_dotenv()
-
 import os
 import pathlib
 import requests
@@ -8,7 +5,7 @@ import functions_framework
 from google.cloud import storage
 
 DIRNAME = pathlib.Path(__file__).parent
-BUCKET_NAME = musa5090s25-team4-raw_data
+BUCKET_NAME = os.environ.get('DATA_LAKE_BUCKET', 'musa5090s26-team4-raw_data')
 
 
 def extract_data(url, filename, blobname):
@@ -32,9 +29,11 @@ def extract_data(url, filename, blobname):
 @functions_framework.http
 def extract_phl_opa_properties(request):
     print('Extracting OPA Properties data...')
+    filename = DIRNAME / 'phl_opa_properties.csv'
+    blobname = 'raw/phl_opa_properties/phl_opa_properties.csv'
     extract_data(
         'https://opendata-downloads.s3.amazonaws.com/opa_properties_public.csv',
-        DIRNAME / 'phl_opa_properties.csv',
-        'raw/phl_opa_properties/phl_opa_properties.csv',
+        filename,
+        blobname,
     )
     return f'Downloaded to {filename} and uploaded to gs://{BUCKET_NAME}/{blobname}'
