@@ -1,0 +1,342 @@
+/* ============================================================
+   City of Philadelphia — Office of Property Assessment
+   Shared Design System — CAMA Project
+   Follows phila.gov visual identity
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap');
+
+/* ---- Design Tokens ---- */
+:root {
+  --phila-blue:        #0f4d90;
+  --phila-dark-blue:   #08274a;
+  --phila-light-blue:  #2176d2;
+  --phila-sky:         #e8f0fb;
+  --phila-gold:        #f3c613;
+  --phila-gold-dark:   #c9a600;
+  --phila-green:       #3a833c;
+  --phila-red:         #cc3300;
+  --phila-orange:      #f99300;
+  --phila-text:        #0a0a0a;
+  --phila-text-muted:  #555555;
+  --phila-bg:          #f0f0f0;
+  --phila-white:       #ffffff;
+  --phila-border:      #d4d4d4;
+  --phila-hover:       #dbe9ff;
+  --phila-shadow:      0 2px 8px rgba(0,0,0,0.14);
+  --font:              'Open Sans', Arial, sans-serif;
+  --radius:            5px;
+}
+
+/* ---- Reset ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--phila-bg);
+  color: var(--phila-text);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.phila-header {
+  background: var(--phila-blue);
+  color: white;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+
+.phila-header-top {
+  background: var(--phila-dark-blue);
+  padding: 3px 1.5rem;
+  font-size: 11px;
+  color: #a8c4e0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.phila-header-top a { color: var(--phila-gold); text-decoration: none; }
+
+.phila-header-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.phila-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  text-decoration: none;
+  color: white;
+  flex-shrink: 0;
+}
+
+.phila-logo-seal {
+  width: 46px;
+  height: 46px;
+  background: var(--phila-gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--phila-dark-blue);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.phila-logo-city {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.phila-logo-dept {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.1s;
+  white-space: nowrap;
+}
+.btn:active { transform: translateY(1px); }
+
+.btn-primary  { background: var(--phila-blue); color: white; }
+.btn-primary:hover  { background: var(--phila-dark-blue); }
+
+.btn-secondary { background: white; color: var(--phila-blue); border: 1.5px solid var(--phila-blue); }
+.btn-secondary:hover { background: var(--phila-sky); }
+
+.btn-gold { background: var(--phila-gold); color: var(--phila-dark-blue); }
+.btn-gold:hover { background: var(--phila-gold-dark); }
+
+.btn-danger { background: var(--phila-red); color: white; }
+.btn-danger:hover { background: #a82900; }
+
+.btn-sm { padding: 0.28rem 0.65rem; font-size: 12px; }
+.btn-lg { padding: 0.7rem 1.4rem; font-size: 15px; }
+
+/* ============================================================
+   FORM CONTROLS
+   ============================================================ */
+.form-group { margin-bottom: 0.8rem; }
+
+label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--phila-text-muted);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 0.48rem 0.75rem;
+  border: 1.5px solid var(--phila-border);
+  border-radius: var(--radius);
+  background: white;
+  color: var(--phila-text);
+  width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--phila-light-blue);
+  box-shadow: 0 0 0 3px rgba(33, 118, 210, 0.18);
+}
+
+.search-bar { display: flex; gap: 0.4rem; }
+.search-bar input { flex: 1; }
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--phila-shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  background: var(--phila-blue);
+  color: white;
+  padding: 0.55rem 1rem;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-header.gold { background: var(--phila-gold); color: var(--phila-dark-blue); }
+.card-header.dark { background: var(--phila-dark-blue); }
+
+.card-body { padding: 1rem; }
+
+/* ============================================================
+   BADGES
+   ============================================================ */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.badge-blue   { background: var(--phila-blue);   color: white; }
+.badge-green  { background: var(--phila-green);  color: white; }
+.badge-red    { background: var(--phila-red);    color: white; }
+.badge-orange { background: var(--phila-orange); color: white; }
+.badge-gold   { background: var(--phila-gold);   color: var(--phila-dark-blue); }
+.badge-gray   { background: #888;                color: white; }
+.badge-dark   { background: var(--phila-dark-blue); color: white; }
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  background: var(--phila-blue);
+  color: white;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 0.48rem 0.75rem;
+  border-bottom: 1px solid var(--phila-border);
+  vertical-align: middle;
+}
+
+.data-table tbody tr:hover td { background: var(--phila-sky); cursor: pointer; }
+.data-table tbody tr.selected td { background: var(--phila-hover); }
+
+/* ============================================================
+   DIVIDER / UTILITIES
+   ============================================================ */
+.divider { height: 1px; background: var(--phila-border); margin: 0.8rem 0; }
+
+.text-blue   { color: var(--phila-blue); }
+.text-muted  { color: var(--phila-text-muted); }
+.text-green  { color: var(--phila-green); }
+.text-red    { color: var(--phila-red); }
+.text-gold   { color: var(--phila-gold-dark); }
+.fw-bold     { font-weight: 700; }
+.text-sm     { font-size: 12px; }
+.text-xs     { font-size: 11px; }
+.text-center { text-align: center; }
+
+.w-100   { width: 100%; }
+.d-flex  { display: flex; }
+.flex-1  { flex: 1; }
+.align-center   { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-1   { gap: 0.5rem; }
+.gap-2   { gap: 1rem; }
+.mt-1 { margin-top: 0.5rem; }
+.mt-2 { margin-top: 1rem; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.p-1  { padding: 0.5rem; }
+.p-2  { padding: 1rem; }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.phila-footer {
+  background: var(--phila-dark-blue);
+  color: #a8c4e0;
+  padding: 1.25rem 1.5rem;
+  font-size: 12px;
+  text-align: center;
+  margin-top: auto;
+}
+.phila-footer a { color: var(--phila-gold); text-decoration: none; }
+.phila-footer a:hover { text-decoration: underline; }
+.footer-copy { margin-top: 0.3rem; opacity: 0.7; }
+
+/* ============================================================
+   REVIEWER-SPECIFIC SHARED CLASSES
+   ============================================================ */
+.header-title-block { text-align: right; color: white; }
+.header-title-main  { font-weight: 700; font-size: 15px; }
+.header-title-sub   { font-size: 11px; opacity: 0.65; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.two-col-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.btn-row       { display: flex; gap: 0.5rem; }
+.toolbar-sep   { opacity: 0.4; }
+.note-prop-label { font-size: 13px; color: var(--phila-text-muted); padding: 0.3rem 0; }
+
+/* ============================================================
+   LEAFLET MAP OVERRIDES
+   ============================================================ */
+.leaflet-popup-content-wrapper {
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.leaflet-popup-content {
+  font-family: var(--font);
+  font-size: 13px;
+  margin: 10px 14px;
+}
+.leaflet-control-zoom a {
+  color: var(--phila-blue) !important;
+  font-weight: 700 !important;
+}
