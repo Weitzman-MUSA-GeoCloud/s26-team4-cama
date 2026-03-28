@@ -86,6 +86,7 @@ def prepare_phl_opa_properties(request):
                 geom = wkt.loads(geom_wkt)
                 x, y = transformer.transform(geom.x, geom.y)
                 row['geog'] = f'POINT({x} {y})'
+            row = {k.lower(): v for k, v in row.items()}
             f.write(json.dumps(row) + '\n')
 
     print(f'Processed data into {prepared_filename}')
