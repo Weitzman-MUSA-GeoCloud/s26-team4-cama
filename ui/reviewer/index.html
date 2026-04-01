@@ -42,7 +42,9 @@
           <div class="form-group">
             <label>Address Search</label>
             <div class="search-bar">
-              <input type="search" id="addressSearch" placeholder="e.g. 1234 Market St" />
+              <div class="search-input-wrap">
+                <input type="search" id="addressSearch" placeholder="e.g. 1234 Market St" autocomplete="off" />
+              </div>
               <button type="button" class="btn btn-primary btn-sm" onclick="searchAddress()">Go</button>
             </div>
           </div>
@@ -126,7 +128,7 @@
       <!-- CENTER: Map -->
       <div class="map-area">
         <div class="map-toolbar">
-          <span>Showing <strong id="mapCount">8</strong> properties</span>
+          <span>Showing <strong id="mapCount">0</strong> properties</span>
           <span class="toolbar-sep">|</span>
           <span id="mapCenter">Philadelphia, PA</span>
           <div class="map-toolbar-actions">
@@ -148,7 +150,7 @@
         <div class="stats-bar">
           <div class="stat-cell">
             <div class="stat-label">Properties</div>
-            <div class="stat-value" id="statCount">8</div>
+            <div class="stat-value" id="statCount">0</div>
           </div>
           <div class="stat-cell">
             <div class="stat-label">Avg Value</div>
@@ -223,6 +225,7 @@
   </div><!-- /app-shell -->
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../js/opa-api.js"></script>
   <script src="js/script.js"></script>
 </body>
 </html>
