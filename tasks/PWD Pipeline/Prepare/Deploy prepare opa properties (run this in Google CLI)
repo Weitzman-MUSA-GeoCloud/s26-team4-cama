@@ -1,0 +1,16 @@
+gcloud functions deploy prepare-pwd-parcels ^
+--gen2 ^
+--region=us-central1 ^
+--runtime=python312 ^
+--source=. ^
+--entry-point=prepare_pwd_parcels ^
+--service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com ^
+--memory=8Gi ^
+--timeout=480s ^
+--set-env-vars=RAW_DATA_BUCKET=musa5090s26-team4-raw_data,PREPARED_DATA_BUCKET=musa5090s26-team4-prepared_data ^
+--trigger-http ^
+--no-allow-unauthenticated
+
+
+then run:
+gcloud functions call prepare-pwd-parcels
