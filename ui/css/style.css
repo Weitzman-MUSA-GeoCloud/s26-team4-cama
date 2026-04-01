@@ -325,6 +325,61 @@ textarea:focus {
 .note-prop-label { font-size: 13px; color: var(--phila-text-muted); padding: 0.3rem 0; }
 
 /* ============================================================
+   SEARCH INPUT WRAPPER (autocomplete container)
+   ============================================================ */
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+}
+.search-input-wrap input { width: 100%; }
+
+/* ============================================================
+   AUTOCOMPLETE DROPDOWN
+   ============================================================ */
+.autocomplete-list {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1.5px solid var(--phila-border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+  z-index: 3000;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.autocomplete-list.open { display: block; }
+
+.autocomplete-item {
+  padding: 0.52rem 1rem;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--phila-border);
+  gap: 0.5rem;
+}
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover,
+.autocomplete-item.focused { background: var(--phila-sky); }
+
+.autocomplete-item-addr { flex: 1; font-weight: 600; color: var(--phila-text); }
+.autocomplete-item-zip  { font-size: 11px; color: var(--phila-text-muted); flex-shrink: 0; }
+
+.autocomplete-status {
+  padding: 0.52rem 1rem;
+  font-size: 12px;
+  color: var(--phila-text-muted);
+  font-style: italic;
+}
+
+/* ============================================================
    LEAFLET MAP OVERRIDES
    ============================================================ */
 .leaflet-popup-content-wrapper {
