@@ -1,0 +1,16 @@
+gcloud functions deploy load_opa_properties ^
+--gen2 ^
+--region=us-central1 ^
+--runtime=python312 ^
+--source=. ^
+--entry-point=load_opa_properties ^
+--service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com ^
+--memory=8Gi ^
+--timeout=480s ^
+--set-env-vars=RAW_DATA_BUCKET=musa5090s26-team4-raw_data,PREPARED_DATA_BUCKET=musa5090s26-team4-prepared_data,SOURCE_DATASET=source,CORE_DATASET=core ^
+--trigger-http ^
+--no-allow-unauthenticated
+
+
+then run:
+gcloud functions call load_opa_properties

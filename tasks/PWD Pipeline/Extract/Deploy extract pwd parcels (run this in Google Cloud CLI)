@@ -1,0 +1,22 @@
+first run:
+
+gcloud functions deploy extract-pwd-parcels \
+--gen2 \
+--region=us-central1 \
+--runtime=python312 \
+--source=. \
+--entry-point=extract_pwd_parcels \
+--service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com \
+--memory=4Gi \
+--timeout=240s \
+--set-env-vars=DATA_LAKE_BUCKET=musa5090s26-team4-raw_data \
+--trigger-http \
+--no-allow-unauthenticated
+
+Single line version:
+
+gcloud functions deploy extract-pwd-parcels --gen2 --region=us-central1 --runtime=python312 --source=. --entry-point=extract_pwd_parcels --service-account=data-pipeline-user@musa5090s26-team4.iam.gserviceaccount.com --memory=4Gi --timeout=240s --set-env-vars=DATA_LAKE_BUCKET=musa5090s26-team4-raw_data --trigger-http --no-allow-unauthenticated
+
+then run:
+
+gcloud functions call extract-pwd-parcels
