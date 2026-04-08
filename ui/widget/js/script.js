@@ -10,6 +10,8 @@
 let widgetMap;
 let widgetMarker = null;
 
+const ADDRESS_ZOOM = 17;
+
 // ── Utilities ────────────────────────────────────────────────
 
 function el(id) { return document.getElementById(id); }
@@ -59,7 +61,7 @@ function setupAutocomplete(inputId, onSelect) {
   let currentResults = [];
 
   const suggest = debounce(async (query) => {
-    if (query.length < 3) { closeDropdown(); return; }
+    if (query.length < 6) { closeDropdown(); return; }
 
     dropdown.innerHTML = '<li class="autocomplete-status">Searching…</li>';
     dropdown.classList.add('open');
@@ -175,16 +177,21 @@ function placeMapMarker(prop) {
   if (widgetMarker) widgetMarker.remove();
   widgetMarker = L.marker([prop.lat, prop.lng])
     .bindPopup(
-      `<div>
-        <div class="map-popup-address">${escHtml(titleCase(prop.location))}</div>
-        <div class="map-popup-pid">Property ID: ${escHtml(prop.parcel_number)}</div>
-        <div class="map-popup-value">Assessed Value: ${fmtMoney(prop.market_value)}</div>
-      </div>`,
+      `<div class="map-popup-address">${escHtml(titleCase(prop.location))}</div>`,
       { maxWidth: 240 }
     )
     .addTo(widgetMap)
     .openPopup();
-  widgetMap.flyTo([prop.lat, prop.lng], 16, { duration: 0.8 });
+  widgetMap.flyTo([prop.lat, prop.lng], ADDRESS_ZOOM, { duration: 0.8 });
+  el('clearMarkerBtn').style.display = 'inline-block';
+}
+
+function clearMarker() {
+  if (widgetMarker) {
+    widgetMarker.remove();
+    widgetMarker = null;
+  }
+  el('clearMarkerBtn').style.display = 'none';
 }
 
 // ── Summary card ─────────────────────────────────────────────
