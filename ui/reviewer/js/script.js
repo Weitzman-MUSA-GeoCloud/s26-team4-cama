@@ -10,34 +10,38 @@
 // ── State ────────────────────────────────────────────────────
 
 let map;
-let markers     = [];
-let props       = [];
-let selectedIdx = null;
-let overlayMode = 'type';
+let markers               = [];
+let props                 = [];
+let selectedIdx           = null;
+let overlayMode           = 'type';
+let boundaryLayer         = null;
+let currentBoundaryType   = 'none';
+let selectedBoundaryLayer = null;   // currently highlighted polygon
+const boundaryCache       = {};
 
 const NOTES_KEY = 'opa_assessor_notes';
 
-const NEIGHBORHOOD_ZIPS = {
-  'Center City':        ['19103', '19102', '19107', '19106'],
-  'Fishtown':           ['19125'],
-  'Northern Liberties': ['19123'],
-  'Kensington':         ['19134', '19133'],
-  'West Philadelphia':  ['19143', '19139', '19104', '19151'],
-  'South Philadelphia': ['19148', '19145', '19146', '19147'],
-  'Germantown':         ['19144', '19138'],
-  'Chestnut Hill':      ['19118'],
-  'Roxborough':         ['19128'],
-  'Manayunk':           ['19127'],
+// ── Boundary Configuration ────────────────────────────────────
+
+const BOUNDARY_APIS = {
+  // Local GeoJSON file (served relative to index.html)
+  neighborhood: '../assets/philadelphia-neighborhoods.geojson',
+  census:       'https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/Census_Tracts_2010/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson',
+  zipcode:      'https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/Zipcodes_Poly/FeatureServer/0/query?outFields=*&where=1%3D1&f=geojson',
 };
 
-const TYPE_KEYWORDS = {
-  'Residential (Single Family)': 'SINGLE',
-  'Residential (Multi-Family)':  'MULTI',
-  'Commercial':                  'COMMERCIAL',
-  'Industrial':                  'INDUSTRIAL',
-  'Vacant Land':                 'VACANT',
-  'Mixed Use':                   'MIXED',
-  'Tax Exempt':                  'EXEMPT',
+// Primary field for each boundary type's display name (checked first)
+const BOUNDARY_NAME_FIELDS = {
+  neighborhood: ['MAPNAME', 'NAME', 'name'],
+  census:       ['NAMELSAD10', 'NAME10', 'TRACTCE10', 'GEOID10'],
+  zipcode:      ['code', 'CODE', 'ZIP_CODE', 'ZIPCODE'],   // service uses lowercase 'code'
+};
+
+const BOUNDARY_LABELS = {
+  none:         { filter: 'Neighborhood',    allOption: 'All Neighborhoods' },
+  neighborhood: { filter: 'Neighborhood',    allOption: 'All Neighborhoods' },
+  census:       { filter: 'Census Tract',    allOption: 'All Census Tracts' },
+  zipcode:      { filter: 'ZIP Code',        allOption: 'All ZIP Codes' },
 };
 
 // ── Utilities ────────────────────────────────────────────────
@@ -110,8 +114,8 @@ function setupAutocomplete(inputId, onSelect) {
     }
   }, 320);
 
-  input.addEventListener('input',  () => suggest(input.value.trim()));
-  input.addEventListener('blur',   () => setTimeout(closeDropdown, 150));
+  input.addEventListener('input',   () => suggest(input.value.trim()));
+  input.addEventListener('blur',    () => setTimeout(closeDropdown, 150));
   input.addEventListener('keydown', e => { if (e.key === 'Escape') closeDropdown(); });
 
   function closeDropdown() {
@@ -139,6 +143,7 @@ function clearMarkers() {
 
 function addMarkers(propList) {
   propList.forEach((prop, idx) => {
+    if (!prop.lat || !prop.lng) return;
     const color = getPropColor(prop);
     const m = L.circleMarker([prop.lat, prop.lng], {
       radius: 7, color: '#fff', weight: 2,
@@ -154,7 +159,7 @@ function addMarkers(propList) {
 function buildPopup(prop) {
   return `<div>
     <div class="map-popup-address">${escHtml(titleCase(prop.location))}</div>
-    <div class="map-popup-pid">OPA #: ${escHtml(prop.parcel_number)}</div>
+    <div class="map-popup-pid">OPA #: ${escHtml(prop.parcel_number || 'N/A')}</div>
     <div class="map-popup-value">Value: ${fmtMoney(prop.market_value)}</div>
   </div>`;
 }
@@ -162,10 +167,10 @@ function buildPopup(prop) {
 function getPropColor(prop) {
   if (overlayMode === 'type') {
     const d = (prop.building_code_description || '').toUpperCase();
-    if (d.includes('VACANT'))                                       return '#3a833c';
-    if (d.includes('COMMERCIAL') || d.includes('STORE') || d.includes('OFFICE')) return '#f99300';
-    if (d.includes('INDUSTRIAL') || d.includes('GARAGE'))          return '#888888';
-    if (d.includes('MIXED'))                                        return '#9b59b6';
+    if (d.includes('VACANT'))                                                      return '#3a833c';
+    if (d.includes('COMMERCIAL') || d.includes('STORE') || d.includes('OFFICE'))  return '#f99300';
+    if (d.includes('INDUSTRIAL') || d.includes('GARAGE'))                         return '#888888';
+    if (d.includes('MIXED'))                                                       return '#9b59b6';
   }
   return '#0f4d90';
 }
@@ -177,6 +182,112 @@ function fitAllMarkers() {
 
 function locateUser() {
   map.locate({ setView: true, maxZoom: 16 });
+}
+
+// ── Boundary Layers ───────────────────────────────────────────
+
+function getBoundaryDisplayName(properties, type) {
+  const fields = BOUNDARY_NAME_FIELDS[type] || [];
+  for (const f of fields) {
+    if (properties[f] != null && String(properties[f]).trim() !== '') {
+      return String(properties[f]).trim();
+    }
+  }
+  // Fallback: first non-null primitive value
+  for (const [, v] of Object.entries(properties)) {
+    if (v != null && typeof v !== 'object' && String(v).trim() !== '') {
+      return String(v).trim();
+    }
+  }
+  return 'Unknown';
+}
+
+// ── Boundary highlight ────────────────────────────────────────
+
+const STYLE_DEFAULT  = { color: '#0f4d90', weight: 1.5, fillOpacity: 0.04, fillColor: '#0f4d90', opacity: 0.65 };
+const STYLE_SELECTED = { color: '#0f4d90', weight: 2.5, fillOpacity: 0.18, fillColor: '#0f4d90', opacity: 0.9 };
+
+function selectBoundaryPolygon(layer, name) {
+  // Reset previous highlight
+  if (selectedBoundaryLayer) selectedBoundaryLayer.setStyle(STYLE_DEFAULT);
+  layer.setStyle(STYLE_SELECTED);
+  layer.bringToFront();
+  selectedBoundaryLayer = layer;
+
+  // Auto-fill the sidebar filter
+  const select = document.getElementById('filterBoundary');
+  for (const opt of select.options) {
+    if (opt.value === name) { select.value = name; break; }
+  }
+}
+
+async function setBoundary(type, btn) {
+  currentBoundaryType   = type;
+  selectedBoundaryLayer = null;
+  document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  // Remove existing boundary layer
+  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+
+  const conf = BOUNDARY_LABELS[type] || BOUNDARY_LABELS.none;
+  document.getElementById('boundaryFilterLabel').textContent = conf.filter;
+
+  if (type === 'none') {
+    document.getElementById('filterBoundary').innerHTML =
+      `<option value="">${conf.allOption}</option>`;
+    return;
+  }
+
+  // Show loading indicator in the dropdown while fetching
+  document.getElementById('filterBoundary').innerHTML = '<option>Loading…</option>';
+
+  try {
+    if (!boundaryCache[type]) {
+      const res = await fetch(BOUNDARY_APIS[type]);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      boundaryCache[type] = await res.json();
+    }
+
+    const geojson = boundaryCache[type];
+
+    // Render boundary polygons on the map
+    boundaryLayer = L.geoJSON(geojson, {
+      style: STYLE_DEFAULT,
+      onEachFeature: (feature, layer) => {
+        const name = getBoundaryDisplayName(feature.properties, type);
+        layer.bindTooltip(escHtml(name), {
+          sticky:    true,
+          className: 'boundary-tooltip',
+          direction: 'top',
+        });
+        // Click polygon → highlight + auto-fill sidebar filter
+        layer.on('click', () => selectBoundaryPolygon(layer, name));
+      },
+    }).addTo(map);
+
+    // Build sorted, deduplicated list of area names for the filter dropdown
+    const names = [
+      ...new Set(
+        geojson.features
+          .map(f => getBoundaryDisplayName(f.properties, type))
+          .filter(n => n && n !== 'Unknown')
+      ),
+    ].sort((a, b) => {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return a.localeCompare(b);
+    });
+
+    document.getElementById('filterBoundary').innerHTML =
+      `<option value="">${conf.allOption}</option>` +
+      names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+
+  } catch (err) {
+    console.error('[reviewer] setBoundary failed:', err);
+    document.getElementById('filterBoundary').innerHTML =
+      `<option value="">${conf.allOption}</option>`;
+  }
 }
 
 // ── Legend ───────────────────────────────────────────────────
@@ -211,18 +322,21 @@ function updateMapOverlay(value) {
 async function loadProperties(filters) {
   setLoadingState(true);
   try {
+    // Fly to geocoded location immediately if coordinates were provided
+    if (filters._lat && filters._lng) {
+      map.flyTo([filters._lat, filters._lng], 16, { duration: 0.8 });
+    }
+
     const results = await OPA.filterProperties(filters, 100);
     props = results;
     clearMarkers();
     addMarkers(props);
-    renderList(props);
     updateStats(props);
     renderLegend();
     if (props.length) fitAllMarkers();
     document.getElementById('mapCenter').textContent =
       props.length ? `${props.length} result${props.length !== 1 ? 's' : ''}` : 'No results';
   } catch (err) {
-    renderListError('Error loading properties. Please try again.');
     console.error('[reviewer] loadProperties:', err);
   }
   setLoadingState(false);
@@ -237,18 +351,21 @@ function searchAddress() {
 }
 
 function applyFilters() {
-  const address  = document.getElementById('addressSearch').value.trim();
-  const nbhLabel = document.getElementById('filterNeighborhood').value;
-  const typeLabel = document.getElementById('filterType').value;
-  const minVal   = document.getElementById('valMin').value.trim();
-  const maxVal   = document.getElementById('valMax').value.trim();
+  const address     = document.getElementById('addressSearch').value.trim();
+  const boundaryVal = document.getElementById('filterBoundary').value;
+  const typeLabel   = document.getElementById('filterType').value;
+  const minVal      = document.getElementById('valMin').value.trim();
+  const maxVal      = document.getElementById('valMax').value.trim();
 
   const filters = {};
-  if (address)  filters.address = address;
-  if (nbhLabel && NEIGHBORHOOD_ZIPS[nbhLabel]) filters.zipCodes = NEIGHBORHOOD_ZIPS[nbhLabel];
-  if (typeLabel && TYPE_KEYWORDS[typeLabel])   filters.buildingKeyword = TYPE_KEYWORDS[typeLabel];
-  if (minVal)   filters.minValue = minVal;
-  if (maxVal)   filters.maxValue = maxVal;
+  if (address)     filters.address = address;
+  if (boundaryVal && currentBoundaryType !== 'none') {
+    filters.boundaryType  = currentBoundaryType;
+    filters.boundaryValue = boundaryVal;
+  }
+  if (typeLabel)   filters.buildingKeyword = typeLabel;
+  if (minVal)      filters.minValue = minVal;
+  if (maxVal)      filters.maxValue = maxVal;
 
   if (!Object.keys(filters).length) {
     alert('Please enter an address or select at least one filter.');
@@ -258,24 +375,16 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['addressSearch', 'filterNeighborhood', 'filterType',
+  ['addressSearch', 'filterBoundary', 'filterType',
    'valMin', 'valMax', 'filterStatus', 'changeThreshold']
-    .forEach(id => { document.getElementById(id).value = ''; });
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
   clearMarkers();
   props = [];
   selectedIdx = null;
-  renderList([]);
   updateStats([]);
+  deselectProperty();
   document.getElementById('mapCenter').textContent = 'Philadelphia, PA';
-  document.getElementById('detailContent').innerHTML = `
-    <div class="empty-state">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
-      </svg>
-      <span class="text-sm">Select a property to view details</span>
-    </div>`;
 }
 
 // ── Property list ─────────────────────────────────────────────
@@ -295,7 +404,7 @@ function renderList(propList) {
       <li class="prop-item" onclick="selectProperty(${i})">
         <div class="prop-addr">${escHtml(titleCase(p.location))}</div>
         <div class="prop-meta">
-          <span>OPA ${escHtml(p.parcel_number)}</span>
+          <span>OPA ${escHtml(p.parcel_number || 'N/A')}</span>
           <span>${fmtMoney(p.market_value)}</span>
         </div>
         <div class="prop-tags">
@@ -318,64 +427,71 @@ function selectProperty(idx, fromMap = false) {
   const prop = props[idx];
   if (!prop) return;
 
-  document.querySelectorAll('.prop-item').forEach((li, i) =>
-    li.classList.toggle('selected', i === idx));
-
-  const items = document.querySelectorAll('.prop-item');
-  if (items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
-
   if (!fromMap && markers[idx]) {
     map.flyTo(markers[idx].getLatLng(), 17, { duration: 0.8 });
     markers[idx].openPopup();
   }
 
-  switchTab('detail', document.querySelector('.tab-btn:nth-child(2)'));
-  renderDetail(prop);
+  // Switch to Overview tab and show the property card
+  switchTab('overview', document.querySelector('.tab-btn'));
+  renderPropertyCard(prop);
 
+  // Populate notes tab
   document.getElementById('notePropLabel').textContent =
-    titleCase(prop.location) + ' (OPA ' + prop.parcel_number + ')';
-
+    titleCase(prop.location) + ' (OPA ' + (prop.parcel_number || 'N/A') + ')';
   const notes = getSavedNotes();
   document.getElementById('assessorNotes').value = notes[prop.parcel_number] || '';
   document.getElementById('recommendedAction').value = '';
 }
 
-// ── Detail pane ───────────────────────────────────────────────
+// ── Property card (right panel, replaces City Overview on selection) ──
 
-function renderDetail(prop) {
-  const addr    = titleCase(prop.location);
-  const owner   = [prop.owner_1, prop.owner_2].filter(Boolean).map(titleCase).join(', ') || '—';
-  const area    = prop.total_livable_area ? Number(prop.total_livable_area).toLocaleString() + ' sq ft' : '—';
-  const lotArea = prop.total_area         ? Number(prop.total_area).toLocaleString() + ' sq ft' : '—';
-  const saleDate = prop.sale_date ? prop.sale_date.split('T')[0] : '—';
+function renderPropertyCard(prop) {
+  // -- Values to display (all sourced from real data; shown as — until backend provides them)
+  const addr          = prop.location        ? titleCase(prop.location)          : '—';
+  const propertyId    = prop.parcel_number   || '—';
+  const taxYearVal    = prop.tax_year_assessed_value  != null
+                          ? fmtMoney(prop.tax_year_assessed_value)  : '—';
+  const currentVal    = prop.current_assessed_value   != null
+                          ? fmtMoney(prop.current_assessed_value)   : '—';
 
-  document.getElementById('detailContent').innerHTML = `
-    <div class="detail-section">
-      <div class="detail-section-title">Property Identification</div>
-      <div class="detail-row"><span class="dl">Address</span><span class="dv">${escHtml(addr)}</span></div>
-      <div class="detail-row"><span class="dl">OPA #</span><span class="dv">${escHtml(prop.parcel_number)}</span></div>
-      <div class="detail-row"><span class="dl">ZIP Code</span><span class="dv">${escHtml(prop.zip_code || '—')}</span></div>
-      <div class="detail-row"><span class="dl">Zoning</span><span class="dv">${escHtml(prop.zoning || '—')}</span></div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-title">Ownership</div>
-      <div class="detail-row"><span class="dl">Owner(s)</span><span class="dv">${escHtml(owner)}</span></div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-title">Assessment &amp; Sales</div>
-      <div class="detail-row"><span class="dl">Market Value</span><span class="dv">${fmtMoney(prop.market_value)}</span></div>
-      <div class="detail-row"><span class="dl">Last Sale Price</span><span class="dv">${fmtMoney(prop.sale_price)}</span></div>
-      <div class="detail-row"><span class="dl">Last Sale Date</span><span class="dv">${escHtml(saleDate)}</span></div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-title">Property Characteristics</div>
-      <div class="detail-row"><span class="dl">Type</span><span class="dv">${escHtml(prop.building_code_description || '—')}</span></div>
-      <div class="detail-row"><span class="dl">Year Built</span><span class="dv">${escHtml(String(prop.year_built || '—'))}</span></div>
-      <div class="detail-row"><span class="dl">Livable Area</span><span class="dv">${escHtml(area)}</span></div>
-      <div class="detail-row"><span class="dl">Lot Area</span><span class="dv">${escHtml(lotArea)}</span></div>
-      <div class="detail-row"><span class="dl">Bedrooms</span><span class="dv">${escHtml(String(prop.number_of_bedrooms || '—'))}</span></div>
-      <div class="detail-row"><span class="dl">Bathrooms</span><span class="dv">${escHtml(String(prop.number_of_bathrooms || '—'))}</span></div>
-    </div>`;
+  // Difference and percent change (computed when both values available)
+  let diffDollars = '—';
+  let diffPct     = '—';
+  let diffClass   = '';
+  if (prop.tax_year_assessed_value != null && prop.current_assessed_value != null) {
+    const delta = prop.current_assessed_value - prop.tax_year_assessed_value;
+    const pct   = prop.tax_year_assessed_value !== 0
+                    ? (delta / prop.tax_year_assessed_value) * 100 : null;
+    diffDollars = (delta >= 0 ? '+' : '') + fmtMoney(delta);
+    diffPct     = pct != null ? (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' : '—';
+    diffClass   = delta > 0 ? 'pc-positive' : delta < 0 ? 'pc-negative' : '';
+  }
+
+  // Update DOM
+  document.getElementById('pcAddress').textContent       = addr;
+  document.getElementById('pcPropertyId').textContent    = propertyId;
+  document.getElementById('pcAddressDetail').textContent = addr;
+  document.getElementById('pcTaxYearValue').textContent  = taxYearVal;
+  document.getElementById('pcCurrentValue').textContent  = currentVal;
+
+  const diffDolEl = document.getElementById('pcDiffDollars');
+  diffDolEl.textContent = diffDollars;
+  diffDolEl.className   = 'pc-value pc-change-dollars ' + diffClass;
+
+  const diffPctEl = document.getElementById('pcDiffPct');
+  diffPctEl.textContent = diffPct;
+  diffPctEl.className   = 'pc-value pc-change-pct ' + diffClass;
+
+  // Toggle panels
+  document.getElementById('cityOverviewPanel').style.display   = 'none';
+  document.getElementById('propertyCardPanel').style.display   = '';
+}
+
+function deselectProperty() {
+  selectedIdx = null;
+  document.getElementById('propertyCardPanel').style.display = 'none';
+  document.getElementById('cityOverviewPanel').style.display = '';
 }
 
 // ── Stats bar ─────────────────────────────────────────────────
@@ -445,11 +561,13 @@ function setLoadingState(on) {
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   renderLegend();
-  renderList([]);
 
-  // Autocomplete: selecting a suggestion immediately triggers a property search
+  // Autocomplete: geocode the address and fly map to result, then attempt property search
   setupAutocomplete('addressSearch', prop => {
-    loadProperties({ address: prop.location });
+    if (prop.lat && prop.lng) {
+      map.flyTo([prop.lat, prop.lng], 16, { duration: 0.8 });
+    }
+    loadProperties({ address: prop.location, _lat: prop.lat, _lng: prop.lng });
   });
 
   document.getElementById('addressSearch').addEventListener('keydown', e => {
