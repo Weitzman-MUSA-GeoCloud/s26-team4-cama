@@ -15,7 +15,10 @@ FROM ML.PREDICT(
       interior_condition,
       quality_grade,
       garage_spaces,
-      central_air
+      central_air,
+      zip_code,
+      category_code
+
     FROM `core.opa_properties`
     WHERE SAFE_CAST(total_livable_area AS FLOAT64) > 0
       AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$')

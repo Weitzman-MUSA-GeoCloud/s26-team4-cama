@@ -11,7 +11,7 @@
 
 ### Sale Price
 
-<p>This represents the price the home sold for most recently, and is critical to predicting what it would sell for now. We excluded sales under $5000 as likely nominal transfers rather than sales that would actually predict price.</p>
+<p>This represents the price the home sold for most recently, and is critical to predicting what it would sell for now. We excluded sales under $5000 as likely nominal transfers rather than sales that would actually predict price, and excluded sales over $50,000,000 to filter out typos.</p>
 
 ### Sale Date
 
@@ -42,6 +42,9 @@
 ### Central Air
 
 <p>A binary variable indicating whether the home has central air, which is strongly correlated with higher sale price.</p>
+
+### Category Code
+<p>Filtered to residential codes (single family, multifamily, and mixed use), a categorical variable showing the type of property. Since we are considering residential properties we did not want to train on vacant land or other nonresidential properties.</p>
 
 ## Not Included
 
