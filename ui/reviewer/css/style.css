@@ -58,13 +58,15 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   padding: 0.38rem 1rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem 1rem;
   font-size: 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
+.toolbar-sep { opacity: 0.4; }
+
 .map-toolbar-actions {
-  margin-left: auto;
   display: flex;
   gap: 0.4rem;
 }
@@ -84,45 +86,80 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 
 .map-toolbar-btn:hover { background: rgba(255,255,255,0.28); }
 
+.basemap-select {
+  padding: 0.18rem 0.45rem;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 3px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: background 0.15s;
+}
+
+.basemap-select:hover { background: rgba(255,255,255,0.22); }
+.basemap-select option { background: #1a3a5c; color: white; }
+
 #map { flex: 1; }
 
-/* ---- Legend ---- */
-.map-legend {
-  position: absolute;
-  bottom: 30px;
-  left: 10px;
-  background: white;
-  border-radius: 5px;
-  padding: 0.5rem 0.75rem;
-  box-shadow: var(--phila-shadow);
-  font-size: 11px;
-  z-index: 500;
-  min-width: 130px;
-}
-
-.map-legend-title {
-  font-weight: 700;
-  color: var(--phila-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  margin-bottom: 0.4rem;
-}
-
-.legend-item {
+/* ---- Boundary toggle ---- */
+.boundary-toggle {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.2rem;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
 }
 
-.legend-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 2px solid white;
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.2);
+.boundary-label {
+  font-size: 10px;
+  opacity: 0.7;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
 }
+
+.boundary-btn {
+  padding: 0.18rem 0.5rem;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  font-family: var(--font);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.boundary-btn:hover {
+  background: rgba(255,255,255,0.22);
+  color: white;
+}
+
+.boundary-btn.active {
+  background: rgba(255,255,255,0.92);
+  color: var(--phila-dark-blue);
+  border-color: white;
+}
+
+/* ---- Boundary tooltip (Leaflet) ---- */
+.boundary-tooltip {
+  background: var(--phila-dark-blue) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 3px !important;
+  font-size: 11px !important;
+  padding: 0.2rem 0.5rem !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+}
+
+.boundary-tooltip::before { display: none !important; }
+
 
 /* ---- Results panel ---- */
 .results-panel {
@@ -153,34 +190,8 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 .stat-cell .stat-value { font-size: 18px; font-weight: 700; color: white; line-height: 1.2; }
 .stat-cell .stat-value.warn { color: var(--phila-gold); }
 
-/* ---- Tabs ---- */
-.result-tabs {
-  display: flex;
-  border-bottom: 2px solid var(--phila-border);
-  flex-shrink: 0;
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 0.55rem 0.5rem;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
-  font-family: var(--font);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  color: var(--phila-text-muted);
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.tab-btn.active { color: var(--phila-blue); border-bottom-color: var(--phila-blue); }
-
-.tab-pane { display: none; flex: 1; overflow-y: auto; flex-direction: column; }
-.tab-pane.active { display: flex; }
+/* ---- Overview pane fills the panel ---- */
+#pane-overview { display: flex; flex: 1; overflow-y: auto; flex-direction: column; }
 
 /* ---- Property list ---- */
 .prop-list { list-style: none; }
@@ -262,6 +273,156 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 
 .empty-state svg { opacity: 0.25; }
 
-/* ---- Notes tab ---- */
-.notes-body { padding: 0.9rem; display: flex; flex-direction: column; gap: 0.7rem; }
-.notes-body textarea { height: 110px; resize: vertical; }
+/* ---- City Overview panel (right panel, pane-overview) ---- */
+.overview-panel {
+  padding: 0.9rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.overview-panel-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--phila-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.overview-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin-bottom: 0.9rem;
+}
+
+.overview-kpi {
+  background: var(--phila-bg);
+  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  min-width: 0;
+}
+
+.overview-kpi-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--phila-text-muted);
+  line-height: 1.3;
+  margin-bottom: 0.25rem;
+}
+
+.overview-kpi-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--phila-blue);
+  line-height: 1;
+}
+
+.overview-chart-block {
+  margin-bottom: 0.8rem;
+}
+
+.overview-chart-title {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--phila-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.overview-chart-area {
+  background: var(--phila-bg);
+  border-radius: 4px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--phila-border);
+}
+
+.overview-no-data {
+  font-size: 11px;
+  color: var(--phila-text-muted);
+  font-style: italic;
+}
+
+/* ---- Property Card panel (replaces Overview on property selection) ---- */
+.property-card-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.prop-card-head {
+  background: var(--phila-blue);
+  color: white;
+  padding: 0.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.prop-card-back {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 3px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.prop-card-back:hover { background: rgba(255,255,255,0.28); }
+
+.prop-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prop-card-body {
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.prop-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--phila-border);
+  gap: 0.5rem;
+  font-size: 13px;
+}
+
+.prop-card-row:last-child { border-bottom: none; }
+
+.prop-card-divider {
+  height: 0.6rem;
+}
+
+.pc-label {
+  color: var(--phila-text-muted);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.pc-value {
+  font-weight: 700;
+  text-align: right;
+  word-break: break-all;
+}
+
+.pc-positive { color: var(--phila-red); }
+.pc-negative { color: var(--phila-green); }

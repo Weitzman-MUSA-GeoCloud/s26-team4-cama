@@ -43,8 +43,9 @@
 
 <p>A binary variable indicating whether the home has central air, which is strongly correlated with higher sale price.</p>
 
-### Category Code
-<p>Filtered to residential codes (single family, multifamily, and mixed use), a categorical variable showing the type of property. Since we are considering residential properties we did not want to train on vacant land or other nonresidential properties.</p>
+### Zip Code
+
+<p>A categorical variable indicating the zip code where the property is located.</p>
 
 ## Not Included
 

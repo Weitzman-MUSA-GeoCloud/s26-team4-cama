@@ -34,7 +34,7 @@
     <!-- MAIN CONTENT -->
     <div class="content-area">
 
-      <!-- LEFT SIDEBAR: Filters -->
+      <!-- LEFT SIDEBAR: Filters only -->
       <aside class="sidebar">
         <div class="sidebar-head">Search &amp; Filters</div>
         <div class="sidebar-body">
@@ -51,20 +51,11 @@
 
           <div class="divider"></div>
 
+          <!-- Boundary-driven area filter — label and options update with boundary toggle -->
           <div class="form-group">
-            <label>Neighborhood</label>
-            <select id="filterNeighborhood" title="Filter by neighborhood">
+            <label id="boundaryFilterLabel">Neighborhood</label>
+            <select id="filterBoundary" title="Filter by area">
               <option value="">All Neighborhoods</option>
-              <option>Center City</option>
-              <option>Fishtown</option>
-              <option>Northern Liberties</option>
-              <option>Kensington</option>
-              <option>West Philadelphia</option>
-              <option>South Philadelphia</option>
-              <option>Germantown</option>
-              <option>Chestnut Hill</option>
-              <option>Roxborough</option>
-              <option>Manayunk</option>
             </select>
           </div>
 
@@ -111,17 +102,6 @@
           <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
           <button type="button" class="btn btn-secondary w-100 mt-1" onclick="resetFilters()">Reset All</button>
 
-          <div class="divider"></div>
-
-          <div class="form-group">
-            <label>Map Symbology</label>
-            <select id="mapOverlay" title="Map symbology mode" onchange="updateMapOverlay(this.value)">
-              <option value="status">Color by Review Status</option>
-              <option value="change">Color by Value Change</option>
-              <option value="type">Color by Property Type</option>
-            </select>
-          </div>
-
         </div>
       </aside>
 
@@ -131,19 +111,31 @@
           <span>Showing <strong id="mapCount">0</strong> properties</span>
           <span class="toolbar-sep">|</span>
           <span id="mapCenter">Philadelphia, PA</span>
+          <!-- Boundary toggle: syncs with sidebar area filter -->
+          <div class="boundary-toggle">
+            <span class="boundary-label">Boundaries:</span>
+            <button type="button" class="boundary-btn active" data-boundary="none" onclick="setBoundary('none', this)">None</button>
+            <button type="button" class="boundary-btn" data-boundary="neighborhood" onclick="setBoundary('neighborhood', this)">Neighborhoods</button>
+            <button type="button" class="boundary-btn" data-boundary="census" onclick="setBoundary('census', this)">Census Tracts</button>
+            <button type="button" class="boundary-btn" data-boundary="zipcode" onclick="setBoundary('zipcode', this)">ZIP Codes</button>
+          </div>
           <div class="map-toolbar-actions">
+            <select id="basemapSelect" class="basemap-select" onchange="setBasemap(this.value)" title="Change basemap">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="osm">Street</option>
+              <option value="satellite">Satellite</option>
+              <option value="topo">Topo</option>
+            </select>
             <button type="button" class="map-toolbar-btn" onclick="fitAllMarkers()">Fit All</button>
             <button type="button" class="map-toolbar-btn" onclick="locateUser()">My Location</button>
           </div>
         </div>
 
         <div id="map"></div>
-
-        <!-- Legend -->
-        <div class="map-legend" id="mapLegend"></div>
       </div>
 
-      <!-- RIGHT PANEL: Results -->
+      <!-- RIGHT PANEL -->
       <div class="results-panel">
 
         <!-- Stats bar -->
@@ -156,69 +148,95 @@
             <div class="stat-label">Avg Value</div>
             <div class="stat-value" id="statAvg">—</div>
           </div>
-          <div class="stat-cell">
-            <div class="stat-label">Flagged</div>
-            <div class="stat-value warn" id="statFlagged">—</div>
-          </div>
         </div>
 
-        <!-- Tabs -->
-        <div class="result-tabs">
-          <button type="button" class="tab-btn active" onclick="switchTab('list', this)">List</button>
-          <button type="button" class="tab-btn" onclick="switchTab('detail', this)">Detail</button>
-          <button type="button" class="tab-btn" onclick="switchTab('notes', this)">Notes</button>
-        </div>
+        <!-- Overview pane: City Overview by default; replaced by Property Card on selection -->
+        <div id="pane-overview">
 
-        <!-- List pane -->
-        <div id="pane-list" class="tab-pane active">
-          <ul class="prop-list" id="propList"></ul>
-        </div>
+          <!-- City Overview — shown when no property is selected -->
+          <div id="cityOverviewPanel" class="overview-panel">
+            <div class="overview-panel-head">City Overview</div>
 
-        <!-- Detail pane -->
-        <div id="pane-detail" class="tab-pane">
-          <div id="detailContent">
-            <div class="empty-state">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-              </svg>
-              <span class="text-sm">Select a property to view details</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Notes pane -->
-        <div id="pane-notes" class="tab-pane">
-          <div class="notes-body">
-            <div class="form-group">
-              <label>Selected Property</label>
-              <div id="notePropLabel" class="note-prop-label">
-                No property selected
+            <div class="overview-kpi-grid">
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">Total Properties</div>
+                <div class="overview-kpi-value" id="ovTotalProps">—</div>
+              </div>
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">Avg Assessed Value</div>
+                <div class="overview-kpi-value" id="ovAvgAssessed">—</div>
+              </div>
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">Avg Predicted Value</div>
+                <div class="overview-kpi-value" id="ovAvgPredicted">—</div>
+              </div>
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">Avg Change</div>
+                <div class="overview-kpi-value" id="ovAvgChange">—</div>
+              </div>
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">Assmt Increases</div>
+                <div class="overview-kpi-value" id="ovIncreases">—</div>
+              </div>
+              <div class="overview-kpi">
+                <div class="overview-kpi-label">High-Change / Anomaly</div>
+                <div class="overview-kpi-value" id="ovHighChange">—</div>
               </div>
             </div>
-            <div class="form-group">
-              <label>Assessor Notes</label>
-              <textarea id="assessorNotes" placeholder="Enter review notes for the selected property..."></textarea>
+
+            <div class="overview-chart-block">
+              <div class="overview-chart-title">Recent Tax Year · Assessed Value Distribution</div>
+              <div class="overview-chart-area" id="ovDistChart">
+                <span class="overview-no-data">No data available</span>
+              </div>
             </div>
-            <div class="btn-row">
-              <button type="button" class="btn btn-primary btn-sm" onclick="saveNote()">Save Note</button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="clearNote()">Clear</button>
+
+            <div class="overview-chart-block">
+              <div class="overview-chart-title">Current / Predicted Value Distribution</div>
+              <div class="overview-chart-area" id="ovPredChart">
+                <span class="overview-no-data">No data available</span>
+              </div>
             </div>
-            <div class="divider"></div>
-            <div class="form-group">
-              <label>Recommended Action</label>
-              <select id="recommendedAction" title="Recommended action for this property">
-                <option value="">— No Action —</option>
-                <option>Approve Assessment</option>
-                <option>Adjust Upward</option>
-                <option>Adjust Downward</option>
-                <option>Flag for Field Inspection</option>
-                <option>Escalate to Supervisor</option>
-              </select>
-            </div>
-            <button type="button" class="btn btn-gold w-100" onclick="submitReview()">Submit Review</button>
           </div>
-        </div>
+
+          <!-- Property Card — hidden until a property is selected -->
+          <div id="propertyCardPanel" class="property-card-panel" style="display:none">
+            <div class="prop-card-head">
+              <button type="button" class="prop-card-back" onclick="deselectProperty()" title="Back to City Overview">&#8592; Overview</button>
+              <span class="prop-card-title" id="pcAddress">—</span>
+            </div>
+
+            <div class="prop-card-body">
+              <div class="prop-card-row">
+                <span class="pc-label">Property ID</span>
+                <span class="pc-value" id="pcPropertyId">—</span>
+              </div>
+              <div class="prop-card-row">
+                <span class="pc-label">Address</span>
+                <span class="pc-value" id="pcAddressDetail">—</span>
+              </div>
+              <div class="prop-card-divider"></div>
+              <div class="prop-card-row">
+                <span class="pc-label">Tax Year Assessed Value</span>
+                <span class="pc-value" id="pcTaxYearValue">—</span>
+              </div>
+              <div class="prop-card-row">
+                <span class="pc-label">Current Assessed Value</span>
+                <span class="pc-value" id="pcCurrentValue">—</span>
+              </div>
+              <div class="prop-card-divider"></div>
+              <div class="prop-card-row">
+                <span class="pc-label">Difference</span>
+                <span class="pc-value pc-change-dollars" id="pcDiffDollars">—</span>
+              </div>
+              <div class="prop-card-row">
+                <span class="pc-label">Percent Change</span>
+                <span class="pc-value pc-change-pct" id="pcDiffPct">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /pane-overview -->
 
       </div><!-- /results-panel -->
     </div><!-- /content-area -->

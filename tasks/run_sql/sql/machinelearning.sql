@@ -15,8 +15,7 @@ SELECT
   quality_grade,
   garage_spaces,
   central_air,
-  zip_code,
-  category_code
+  zip_code
 
 FROM
   `core.opa_properties`
