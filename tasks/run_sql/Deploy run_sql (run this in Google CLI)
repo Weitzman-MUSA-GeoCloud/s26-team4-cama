@@ -25,3 +25,9 @@ curl -H "Authorization: bearer $(gcloud auth print-identity-token)" \
 "https://us-central1-musa5090s26-team4.cloudfunctions.net/run_sql?sql=the_name_of_the_sql.sql"
 
 You need to redeploy this function each time you add a sql file to the sql subfolder
+
+
+
+curl -H "Authorization: bearer $(gcloud auth print-identity-token)" \
+"https://us-central1-musa5090s26-team4.cloudfunctions.net/run_sql?sql=runmlmodel.sql"
+

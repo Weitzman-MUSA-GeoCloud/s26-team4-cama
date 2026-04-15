@@ -1,5 +1,7 @@
 --you will need to update the predictors here if you update them in the model
 
+CREATE OR REPLACE TABLE `musa5090s26-team4.derived.current_assessments`
+AS (
 SELECT
   property_id,
   predicted_sale_price AS predicted_value,
@@ -20,4 +22,5 @@ FROM ML.PREDICT(
     WHERE SAFE_CAST(total_livable_area AS FLOAT64) > 0
       AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$')
   )
+)
 );
