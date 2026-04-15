@@ -18,8 +18,11 @@ let boundaryLayer         = null;
 let currentBoundaryType   = 'none';
 let selectedBoundaryLayer = null;   // currently highlighted polygon
 const boundaryCache       = {};
+let boundaryLoadId        = 0;      // incremented on each setBoundary call to cancel stale fetches
 
-const NOTES_KEY = 'opa_assessor_notes';
+// Basemap layers (populated in initMap)
+const baseLayers = {};
+let currentBasemap = null;
 
 // ── Boundary Configuration ────────────────────────────────────
 
@@ -129,11 +132,41 @@ function setupAutocomplete(inputId, onSelect) {
 
 function initMap() {
   map = L.map('map', { center: [39.9526, -75.1652], zoom: 12 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA',
-    subdomains: 'abcd',
-    maxZoom: 20,
-  }).addTo(map);
+
+  baseLayers.light = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA', subdomains: 'abcd', maxZoom: 20 }
+  );
+  baseLayers.dark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA', subdomains: 'abcd', maxZoom: 20 }
+  );
+  baseLayers.osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | City of Philadelphia OPA', maxZoom: 19 }
+  );
+  baseLayers.satellite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS, NOAA | City of Philadelphia OPA', maxZoom: 19 }
+  );
+  baseLayers.topo = L.tileLayer(
+    'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap | City of Philadelphia OPA', maxZoom: 17 }
+  );
+
+  currentBasemap = baseLayers.light;
+  currentBasemap.addTo(map);
+}
+
+function setBasemap(value) {
+  const next = baseLayers[value] || baseLayers.light;
+  if (next === currentBasemap) return;
+  if (currentBasemap) map.removeLayer(currentBasemap);
+  currentBasemap = next;
+  currentBasemap.addTo(map);
+  // Keep boundary and markers on top
+  if (boundaryLayer) boundaryLayer.bringToFront();
+  markers.forEach(m => m.bringToFront && m.bringToFront());
 }
 
 function clearMarkers() {
@@ -222,12 +255,16 @@ function selectBoundaryPolygon(layer, name) {
 }
 
 async function setBoundary(type, btn) {
+  // Increment the load ID — any in-flight fetch for a previous call will see
+  // its ID is stale and bail out, preventing layer overlap.
+  const myLoadId = ++boundaryLoadId;
+
   currentBoundaryType   = type;
   selectedBoundaryLayer = null;
   document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 
-  // Remove existing boundary layer
+  // Remove existing boundary layer immediately (synchronous — no race here)
   if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
 
   const conf = BOUNDARY_LABELS[type] || BOUNDARY_LABELS.none;
@@ -248,6 +285,9 @@ async function setBoundary(type, btn) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       boundaryCache[type] = await res.json();
     }
+
+    // Another setBoundary call was made while we were awaiting — discard this result
+    if (myLoadId !== boundaryLoadId) return;
 
     const geojson = boundaryCache[type];
 
@@ -284,6 +324,7 @@ async function setBoundary(type, btn) {
       names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
 
   } catch (err) {
+    if (myLoadId !== boundaryLoadId) return;
     console.error('[reviewer] setBoundary failed:', err);
     document.getElementById('filterBoundary').innerHTML =
       `<option value="">${conf.allOption}</option>`;
@@ -375,9 +416,23 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['addressSearch', 'filterBoundary', 'filterType',
-   'valMin', 'valMax', 'filterStatus', 'changeThreshold']
+  // Cancel any in-flight boundary fetch
+  boundaryLoadId++;
+
+  // Clear form fields
+  ['addressSearch', 'filterType', 'valMin', 'valMax', 'filterStatus', 'changeThreshold']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  // Remove boundary layer from map and reset all boundary UI state
+  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+  selectedBoundaryLayer = null;
+  currentBoundaryType   = 'none';
+  document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
+  const noneBtn = document.querySelector('.boundary-btn[data-boundary="none"]');
+  if (noneBtn) noneBtn.classList.add('active');
+  document.getElementById('boundaryFilterLabel').textContent = BOUNDARY_LABELS.none.filter;
+  document.getElementById('filterBoundary').innerHTML =
+    `<option value="">${BOUNDARY_LABELS.none.allOption}</option>`;
 
   clearMarkers();
   props = [];
@@ -432,16 +487,7 @@ function selectProperty(idx, fromMap = false) {
     markers[idx].openPopup();
   }
 
-  // Switch to Overview tab and show the property card
-  switchTab('overview', document.querySelector('.tab-btn'));
   renderPropertyCard(prop);
-
-  // Populate notes tab
-  document.getElementById('notePropLabel').textContent =
-    titleCase(prop.location) + ' (OPA ' + (prop.parcel_number || 'N/A') + ')';
-  const notes = getSavedNotes();
-  document.getElementById('assessorNotes').value = notes[prop.parcel_number] || '';
-  document.getElementById('recommendedAction').value = '';
 }
 
 // ── Property card (right panel, replaces City Overview on selection) ──
@@ -504,49 +550,6 @@ function updateStats(propList) {
   document.getElementById('mapCount').textContent  = count;
   document.getElementById('statCount').textContent = count;
   document.getElementById('statAvg').textContent   = count ? fmtMoney(avg) : '—';
-  document.getElementById('statFlagged').textContent = '—';
-}
-
-// ── Tabs ─────────────────────────────────────────────────────
-
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  const pane = document.getElementById(`pane-${name}`);
-  if (pane) pane.classList.add('active');
-}
-
-// ── Notes ────────────────────────────────────────────────────
-
-function getSavedNotes() {
-  try { return JSON.parse(sessionStorage.getItem(NOTES_KEY) || '{}'); }
-  catch { return {}; }
-}
-
-function saveNote() {
-  if (selectedIdx === null) { alert('Select a property first.'); return; }
-  const prop  = props[selectedIdx];
-  const text  = document.getElementById('assessorNotes').value.trim();
-  const notes = getSavedNotes();
-  if (text) notes[prop.parcel_number] = text;
-  else delete notes[prop.parcel_number];
-  sessionStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-  alert('Note saved.');
-}
-
-function clearNote() {
-  document.getElementById('assessorNotes').value = '';
-}
-
-function submitReview() {
-  if (selectedIdx === null) { alert('Select a property first.'); return; }
-  const action = document.getElementById('recommendedAction').value;
-  if (!action) { alert('Select a recommended action.'); return; }
-  const prop = props[selectedIdx];
-  const note = document.getElementById('assessorNotes').value.trim();
-  // TODO: POST to CAMA backend when available
-  alert(`Review submitted for ${titleCase(prop.location)}.\nAction: ${action}${note ? '\nNote: ' + note : ''}`);
 }
 
 // ── Loading state ─────────────────────────────────────────────
