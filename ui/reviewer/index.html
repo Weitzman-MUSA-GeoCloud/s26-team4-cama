@@ -102,17 +102,6 @@
           <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
           <button type="button" class="btn btn-secondary w-100 mt-1" onclick="resetFilters()">Reset All</button>
 
-          <div class="divider"></div>
-
-          <div class="form-group">
-            <label>Map Symbology</label>
-            <select id="mapOverlay" title="Map symbology mode" onchange="updateMapOverlay(this.value)">
-              <option value="status">Color by Review Status</option>
-              <option value="change">Color by Value Change</option>
-              <option value="type">Color by Property Type</option>
-            </select>
-          </div>
-
         </div>
       </aside>
 
@@ -144,9 +133,6 @@
         </div>
 
         <div id="map"></div>
-
-        <!-- Legend -->
-        <div class="map-legend" id="mapLegend"></div>
       </div>
 
       <!-- RIGHT PANEL -->

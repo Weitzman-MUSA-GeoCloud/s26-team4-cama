@@ -13,7 +13,6 @@ let map;
 let markers               = [];
 let props                 = [];
 let selectedIdx           = null;
-let overlayMode           = 'type';
 let boundaryLayer         = null;
 let currentBoundaryType   = 'none';
 let selectedBoundaryLayer = null;   // currently highlighted polygon
@@ -177,10 +176,9 @@ function clearMarkers() {
 function addMarkers(propList) {
   propList.forEach((prop, idx) => {
     if (!prop.lat || !prop.lng) return;
-    const color = getPropColor(prop);
     const m = L.circleMarker([prop.lat, prop.lng], {
       radius: 7, color: '#fff', weight: 2,
-      fillColor: color, fillOpacity: 0.85,
+      fillColor: '#0f4d90', fillOpacity: 0.85,
     })
       .bindPopup(buildPopup(prop), { maxWidth: 220 })
       .addTo(map);
@@ -195,17 +193,6 @@ function buildPopup(prop) {
     <div class="map-popup-pid">OPA #: ${escHtml(prop.parcel_number || 'N/A')}</div>
     <div class="map-popup-value">Value: ${fmtMoney(prop.market_value)}</div>
   </div>`;
-}
-
-function getPropColor(prop) {
-  if (overlayMode === 'type') {
-    const d = (prop.building_code_description || '').toUpperCase();
-    if (d.includes('VACANT'))                                                      return '#3a833c';
-    if (d.includes('COMMERCIAL') || d.includes('STORE') || d.includes('OFFICE'))  return '#f99300';
-    if (d.includes('INDUSTRIAL') || d.includes('GARAGE'))                         return '#888888';
-    if (d.includes('MIXED'))                                                       return '#9b59b6';
-  }
-  return '#0f4d90';
 }
 
 function fitAllMarkers() {
@@ -331,33 +318,6 @@ async function setBoundary(type, btn) {
   }
 }
 
-// ── Legend ───────────────────────────────────────────────────
-
-function renderLegend() {
-  const LEGENDS = {
-    type: `
-      <div class="map-legend-title">Property Type</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Residential</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#f99300"></div> Commercial</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#888888"></div> Industrial</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#3a833c"></div> Vacant Land</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#9b59b6"></div> Mixed Use</div>`,
-    status: `
-      <div class="map-legend-title">Review Status</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Pending Review</div>`,
-    change: `
-      <div class="map-legend-title">Value Change</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Properties</div>`,
-  };
-  document.getElementById('mapLegend').innerHTML = LEGENDS[overlayMode] || LEGENDS.type;
-}
-
-function updateMapOverlay(value) {
-  overlayMode = value;
-  markers.forEach((m, i) => m.setStyle({ fillColor: getPropColor(props[i]) }));
-  renderLegend();
-}
-
 // ── Load properties ──────────────────────────────────────────
 
 async function loadProperties(filters) {
@@ -373,7 +333,6 @@ async function loadProperties(filters) {
     clearMarkers();
     addMarkers(props);
     updateStats(props);
-    renderLegend();
     if (props.length) fitAllMarkers();
     document.getElementById('mapCenter').textContent =
       props.length ? `${props.length} result${props.length !== 1 ? 's' : ''}` : 'No results';
@@ -563,7 +522,6 @@ function setLoadingState(on) {
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
-  renderLegend();
 
   // Autocomplete: geocode the address and fly map to result, then attempt property search
   setupAutocomplete('addressSearch', prop => {
