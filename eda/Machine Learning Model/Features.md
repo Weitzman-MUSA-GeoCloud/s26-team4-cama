@@ -43,6 +43,10 @@
 
 <p>A binary variable indicating whether the home has central air, which is strongly correlated with higher sale price.</p>
 
+### Zip Code
+
+<p>A categorical variable indicating the zip code where the property is located.</p>
+
 ## Not Included
 
 ### Age of Home
