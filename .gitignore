@@ -13,3 +13,4 @@ data/
 
 # Sensitive files
 keys/
+venv312/
