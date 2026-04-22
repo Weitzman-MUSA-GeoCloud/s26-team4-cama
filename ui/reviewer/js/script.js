@@ -23,6 +23,44 @@ let boundaryLoadId        = 0;      // incremented on each setBoundary call to c
 const baseLayers = {};
 let currentBasemap = null;
 
+// Property tile layer
+const PROPERTY_TILE_URL  = 'https://storage.googleapis.com/musa5090s26-team4-public/tiles/properties/{z}/{x}/{y}.pbf';
+const PROPERTY_LAYER_NAME = 'property_tile_info';
+
+let propertyTileLayer      = null;
+let propertyLayerVisible   = true;
+let selectedTileFeatureId  = null;
+
+// YlOrRd color ramp breakpoints for current_assessed_value
+const VALUE_BREAKS = [
+  { limit:   50_000, color: '#ffffb2' },
+  { limit:  100_000, color: '#fecc5c' },
+  { limit:  200_000, color: '#fd8d3c' },
+  { limit:  350_000, color: '#f03b20' },
+  { limit:  600_000, color: '#bd0026' },
+  { limit: Infinity, color: '#67001f' },
+];
+
+function getValueColor(value) {
+  const v = parseInt(value, 10);
+  if (!v || v <= 0) return '#aaaaaa';
+  for (const { limit, color } of VALUE_BREAKS) {
+    if (v < limit) return color;
+  }
+  return '#67001f';
+}
+
+function tileFeatureStyle(properties) {
+  return {
+    fill:        true,
+    fillColor:   getValueColor(properties.predicted_value),
+    fillOpacity: 0.75,
+    weight:      0.4,
+    color:       '#666',
+    opacity:     0.6,
+  };
+}
+
 // ── Boundary Configuration ────────────────────────────────────
 
 const BOUNDARY_APIS = {
@@ -127,6 +165,117 @@ function setupAutocomplete(inputId, onSelect) {
   }
 }
 
+// ── Property Tile Layer ───────────────────────────────────────
+
+let legendControl = null;
+
+const LEGEND_HTML = `
+  <div class="map-legend-title">Current Assessed Value</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#aaaaaa"></span>No data</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#ffffb2"></span>&lt; $50K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#fecc5c"></span>$50K – $100K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#fd8d3c"></span>$100K – $200K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#f03b20"></span>$200K – $350K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#bd0026"></span>$350K – $600K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#67001f"></span>$600K+</div>
+`;
+
+function initPropertyTileLayer() {
+  propertyTileLayer = L.vectorGrid.protobuf(PROPERTY_TILE_URL, {
+    rendererFactory: L.canvas.tile,
+    vectorTileLayerStyles: {
+      [PROPERTY_LAYER_NAME]: tileFeatureStyle,
+    },
+    interactive:     true,
+    maxNativeZoom:   16,
+    getFeatureId:    f => f.properties.property_id,
+  });
+
+  propertyTileLayer.on('click', e => {
+    L.DomEvent.stopPropagation(e);
+    const tileProps = e.layer.properties;
+    if (!tileProps) return;
+
+    if (selectedTileFeatureId !== null) {
+      propertyTileLayer.resetFeatureStyle(selectedTileFeatureId);
+    }
+    selectedTileFeatureId = tileProps.property_id;
+    propertyTileLayer.setFeatureStyle(selectedTileFeatureId, {
+      fill:        true,
+      fillColor:   getValueColor(tileProps.predicted_value),
+      fillOpacity: 1.0,
+      stroke:      true,
+      weight:      2,
+      color:       '#0f4d90',
+      opacity:     1.0,
+    });
+
+    showTilePropertyCard(tileProps);
+  });
+
+  propertyTileLayer.addTo(map);
+
+  // Build the legend as a proper Leaflet control so it renders inside
+  // Leaflet's control container (immune to overflow:hidden on parent divs)
+  legendControl = L.control({ position: 'bottomleft' });
+  legendControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.innerHTML = LEGEND_HTML;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  legendControl.addTo(map);
+}
+
+function showTilePropertyCard(tileProps) {
+  const addr = tileProps.address ? titleCase(tileProps.address) : '—';
+
+  document.getElementById('pcAddress').textContent       = addr;
+  document.getElementById('pcPropertyId').textContent    = tileProps.property_id || '—';
+  document.getElementById('pcAddressDetail').textContent = addr;
+  document.getElementById('pcTaxYearValue').textContent  =
+    tileProps.predicted_value != null ? fmtMoney(tileProps.predicted_value) : '—';
+  document.getElementById('pcCurrentValue').textContent  =
+    tileProps.market_value != null ? fmtMoney(tileProps.market_value) : '—';
+
+  let diffDollars = '—', diffPct = '—', diffClass = '';
+  const tyv = Number(tileProps.predicted_value);
+  const cav = Number(tileProps.market_value);
+  if (tyv && cav) {
+    const delta = cav - tyv;
+    const pct   = tyv !== 0 ? (delta / tyv) * 100 : null;
+    diffDollars = (delta >= 0 ? '+' : '') + fmtMoney(delta);
+    diffPct     = pct != null ? (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' : '—';
+    diffClass   = delta > 0 ? 'pc-positive' : delta < 0 ? 'pc-negative' : '';
+  }
+
+  const diffDolEl = document.getElementById('pcDiffDollars');
+  diffDolEl.textContent = diffDollars;
+  diffDolEl.className   = 'pc-value pc-change-dollars ' + diffClass;
+
+  const diffPctEl = document.getElementById('pcDiffPct');
+  diffPctEl.textContent = diffPct;
+  diffPctEl.className   = 'pc-value pc-change-pct ' + diffClass;
+
+  document.getElementById('cityOverviewPanel').style.display = 'none';
+  document.getElementById('propertyCardPanel').style.display = '';
+}
+
+function togglePropertyLayer(btn) {
+  propertyLayerVisible = !propertyLayerVisible;
+  if (propertyLayerVisible) {
+    propertyTileLayer.addTo(map);
+    legendControl.addTo(map);
+    btn.classList.add('active');
+  } else {
+    map.removeLayer(propertyTileLayer);
+    map.removeControl(legendControl);
+    btn.classList.remove('active');
+  }
+  if (boundaryLayer) boundaryLayer.bringToFront();
+  markers.forEach(m => m.bringToFront && m.bringToFront());
+}
+
 // ── Map ──────────────────────────────────────────────────────
 
 function initMap() {
@@ -155,6 +304,8 @@ function initMap() {
 
   currentBasemap = baseLayers.light;
   currentBasemap.addTo(map);
+
+  initPropertyTileLayer();
 }
 
 function setBasemap(value) {
@@ -494,6 +645,10 @@ function renderPropertyCard(prop) {
 }
 
 function deselectProperty() {
+  if (selectedTileFeatureId !== null && propertyTileLayer) {
+    propertyTileLayer.resetFeatureStyle(selectedTileFeatureId);
+    selectedTileFeatureId = null;
+  }
   selectedIdx = null;
   document.getElementById('propertyCardPanel').style.display = 'none';
   document.getElementById('cityOverviewPanel').style.display = '';

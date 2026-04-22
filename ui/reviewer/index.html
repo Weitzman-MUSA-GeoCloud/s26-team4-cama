@@ -120,6 +120,8 @@
             <button type="button" class="boundary-btn" data-boundary="zipcode" onclick="setBoundary('zipcode', this)">ZIP Codes</button>
           </div>
           <div class="map-toolbar-actions">
+            <button type="button" class="boundary-btn active" id="propertyLayerBtn" onclick="togglePropertyLayer(this)" title="Toggle property value layer">Properties</button>
+            <span class="toolbar-sep">|</span>
             <select id="basemapSelect" class="basemap-select" onchange="setBasemap(this.value)" title="Change basemap">
               <option value="light">Light</option>
               <option value="dark">Dark</option>
@@ -246,6 +248,7 @@
   </div><!-- /app-shell -->
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
   <script src="../js/opa-api.js"></script>
   <script src="js/script.js"></script>
