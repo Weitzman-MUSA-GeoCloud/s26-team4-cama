@@ -323,26 +323,54 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   margin-bottom: 0.8rem;
 }
 
+.overview-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
 .overview-chart-title {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
   color: var(--phila-text-muted);
-  margin-bottom: 0.35rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  white-space: nowrap;
 }
 
-.overview-chart-year {
+/* ---- Year selector ---- */
+.year-selector {
+  display: flex;
+  gap: 0.2rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.year-btn {
+  padding: 0.1rem 0.38rem;
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid var(--phila-border);
+  border-radius: 3px;
+  background: white;
+  color: var(--phila-text-muted);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  line-height: 1.6;
+}
+
+.year-btn:hover {
+  background: var(--phila-bg);
+  color: var(--phila-blue);
+  border-color: var(--phila-blue);
+}
+
+.year-btn.active {
   background: var(--phila-blue);
   color: white;
-  border-radius: 3px;
-  padding: 0.05rem 0.35rem;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  text-transform: none;
+  border-color: var(--phila-blue);
 }
 
 .overview-chart-area {
@@ -353,7 +381,9 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--phila-border);
-  overflow: hidden;
+  /* overflow must stay visible so ApexCharts tooltips aren't clipped */
+  overflow: visible;
+  position: relative;
 }
 
 /* Once ApexCharts renders, it fills the container — reset flex centering */
