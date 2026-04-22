@@ -329,16 +329,37 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   letter-spacing: 0.4px;
   color: var(--phila-text-muted);
   margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.overview-chart-year {
+  background: var(--phila-blue);
+  color: white;
+  border-radius: 3px;
+  padding: 0.05rem 0.35rem;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: none;
 }
 
 .overview-chart-area {
   background: var(--phila-bg);
   border-radius: 4px;
-  height: 72px;
+  min-height: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--phila-border);
+  overflow: hidden;
+}
+
+/* Once ApexCharts renders, it fills the container — reset flex centering */
+.overview-chart-area:has(> .apexcharts-canvas) {
+  display: block;
+  border-style: solid;
 }
 
 .overview-no-data {
