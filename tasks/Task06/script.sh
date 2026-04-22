@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -ex
+
+# Download the property_tile_info.geojson file from the temp bucket.
+gcloud storage cp \
+  gs://musa5090s26-team4-temp_data/property_tile_info.geojson \
+  ./property_tile_info.geojson
+
+# Convert the geojson file to a vector tileset in a folder named "properties".
+ogr2ogr \
+  -f MVT \
+  -dsco MINZOOM=12 \
+  -dsco MAXZOOM=18 \
+  -dsco COMPRESS=YES \
+  -dsco MAX_SIZE=1000000
+  ./properties \
+  ./property_tile_info.geojson
+
+# Upload the vector tileset to the public bucket.
+gcloud storage cp \
+  --recursive \
+  --content-type=application/vnd.mapbox-vector-tile \
+  --content-encoding=gzip \
+  --do-not-decompress \
+  ./properties \
+  gs://musa5090s26-team4-public/tiles
