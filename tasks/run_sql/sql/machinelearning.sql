@@ -27,9 +27,9 @@ LEFT JOIN `core.census_zip` c
   ON p.zip_code = CAST(c.zip_code AS STRING)
 
 WHERE
-  SAFE_CAST(p.sale_price AS FLOAT64) > 5000
-  AND SAFE_CAST(p.sale_price AS FLOAT64) < 50000000
-  AND SAFE_CAST(p.total_livable_area AS FLOAT64) > 0
-  AND REGEXP_CONTAINS(p.quality_grade, r'^[A-Z][+-]?$')
-  AND p.category_code IN ('1', '2', '3')
-;
+  SAFE_CAST(sale_price AS FLOAT64) > 5000
+  AND SAFE_CAST(sale_price AS FLOAT64) < 50000000
+  AND SAFE_CAST(total_livable_area AS FLOAT64) > 0
+  AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$')
+  AND category_code IN ('1', '2', '3') --residential and mixed use
+  ;

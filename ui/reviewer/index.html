@@ -102,17 +102,6 @@
           <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
           <button type="button" class="btn btn-secondary w-100 mt-1" onclick="resetFilters()">Reset All</button>
 
-          <div class="divider"></div>
-
-          <div class="form-group">
-            <label>Map Symbology</label>
-            <select id="mapOverlay" title="Map symbology mode" onchange="updateMapOverlay(this.value)">
-              <option value="status">Color by Review Status</option>
-              <option value="change">Color by Value Change</option>
-              <option value="type">Color by Property Type</option>
-            </select>
-          </div>
-
         </div>
       </aside>
 
@@ -125,21 +114,27 @@
           <!-- Boundary toggle: syncs with sidebar area filter -->
           <div class="boundary-toggle">
             <span class="boundary-label">Boundaries:</span>
-            <button type="button" class="boundary-btn active" onclick="setBoundary('none', this)">None</button>
-            <button type="button" class="boundary-btn" onclick="setBoundary('neighborhood', this)">Neighborhoods</button>
-            <button type="button" class="boundary-btn" onclick="setBoundary('census', this)">Census Tracts</button>
-            <button type="button" class="boundary-btn" onclick="setBoundary('zipcode', this)">ZIP Codes</button>
+            <button type="button" class="boundary-btn active" data-boundary="none" onclick="setBoundary('none', this)">None</button>
+            <button type="button" class="boundary-btn" data-boundary="neighborhood" onclick="setBoundary('neighborhood', this)">Neighborhoods</button>
+            <button type="button" class="boundary-btn" data-boundary="census" onclick="setBoundary('census', this)">Census Tracts</button>
+            <button type="button" class="boundary-btn" data-boundary="zipcode" onclick="setBoundary('zipcode', this)">ZIP Codes</button>
           </div>
           <div class="map-toolbar-actions">
+            <button type="button" class="boundary-btn active" id="propertyLayerBtn" onclick="togglePropertyLayer(this)" title="Toggle property value layer">Properties</button>
+            <span class="toolbar-sep">|</span>
+            <select id="basemapSelect" class="basemap-select" onchange="setBasemap(this.value)" title="Change basemap">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="osm">Street</option>
+              <option value="satellite">Satellite</option>
+              <option value="topo">Topo</option>
+            </select>
             <button type="button" class="map-toolbar-btn" onclick="fitAllMarkers()">Fit All</button>
             <button type="button" class="map-toolbar-btn" onclick="locateUser()">My Location</button>
           </div>
         </div>
 
         <div id="map"></div>
-
-        <!-- Legend -->
-        <div class="map-legend" id="mapLegend"></div>
       </div>
 
       <!-- RIGHT PANEL -->
@@ -155,20 +150,10 @@
             <div class="stat-label">Avg Value</div>
             <div class="stat-value" id="statAvg">—</div>
           </div>
-          <div class="stat-cell">
-            <div class="stat-label">Flagged</div>
-            <div class="stat-value warn" id="statFlagged">—</div>
-          </div>
-        </div>
-
-        <!-- Tabs: Overview (default) | Notes -->
-        <div class="result-tabs">
-          <button type="button" class="tab-btn active" onclick="switchTab('overview', this)">Overview</button>
-          <button type="button" class="tab-btn" onclick="switchTab('notes', this)">Notes</button>
         </div>
 
         <!-- Overview pane: City Overview by default; replaced by Property Card on selection -->
-        <div id="pane-overview" class="tab-pane active">
+        <div id="pane-overview">
 
           <!-- City Overview — shown when no property is selected -->
           <div id="cityOverviewPanel" class="overview-panel">
@@ -202,9 +187,12 @@
             </div>
 
             <div class="overview-chart-block">
-              <div class="overview-chart-title">Recent Tax Year · Assessed Value Distribution</div>
+              <div class="overview-chart-header">
+                <span class="overview-chart-title">Assessed Value Distribution</span>
+                <div class="year-selector" id="yearSelector"></div>
+              </div>
               <div class="overview-chart-area" id="ovDistChart">
-                <span class="overview-no-data">No data available</span>
+                <span class="overview-no-data" id="ovDistMsg">Loading…</span>
               </div>
             </div>
 
@@ -255,44 +243,13 @@
 
         </div><!-- /pane-overview -->
 
-        <!-- Notes pane -->
-        <div id="pane-notes" class="tab-pane">
-          <div class="notes-body">
-            <div class="form-group">
-              <label>Selected Property</label>
-              <div id="notePropLabel" class="note-prop-label">
-                No property selected
-              </div>
-            </div>
-            <div class="form-group">
-              <label>Assessor Notes</label>
-              <textarea id="assessorNotes" placeholder="Enter review notes for the selected property..."></textarea>
-            </div>
-            <div class="btn-row">
-              <button type="button" class="btn btn-primary btn-sm" onclick="saveNote()">Save Note</button>
-              <button type="button" class="btn btn-secondary btn-sm" onclick="clearNote()">Clear</button>
-            </div>
-            <div class="divider"></div>
-            <div class="form-group">
-              <label>Recommended Action</label>
-              <select id="recommendedAction" title="Recommended action for this property">
-                <option value="">— No Action —</option>
-                <option>Approve Assessment</option>
-                <option>Adjust Upward</option>
-                <option>Adjust Downward</option>
-                <option>Flag for Field Inspection</option>
-                <option>Escalate to Supervisor</option>
-              </select>
-            </div>
-            <button type="button" class="btn btn-gold w-100" onclick="submitReview()">Submit Review</button>
-          </div>
-        </div>
-
       </div><!-- /results-panel -->
     </div><!-- /content-area -->
   </div><!-- /app-shell -->
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
   <script src="../js/opa-api.js"></script>
   <script src="js/script.js"></script>
 </body>

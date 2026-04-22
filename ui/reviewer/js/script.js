@@ -13,13 +13,53 @@ let map;
 let markers               = [];
 let props                 = [];
 let selectedIdx           = null;
-let overlayMode           = 'type';
 let boundaryLayer         = null;
 let currentBoundaryType   = 'none';
 let selectedBoundaryLayer = null;   // currently highlighted polygon
 const boundaryCache       = {};
+let boundaryLoadId        = 0;      // incremented on each setBoundary call to cancel stale fetches
 
-const NOTES_KEY = 'opa_assessor_notes';
+// Basemap layers (populated in initMap)
+const baseLayers = {};
+let currentBasemap = null;
+
+// Property tile layer
+const PROPERTY_TILE_URL  = 'https://storage.googleapis.com/musa5090s26-team4-public/tiles/properties/{z}/{x}/{y}.pbf';
+const PROPERTY_LAYER_NAME = 'property_tile_info';
+
+let propertyTileLayer      = null;
+let propertyLayerVisible   = true;
+let selectedTileFeatureId  = null;
+
+// YlOrRd color ramp breakpoints for current_assessed_value
+const VALUE_BREAKS = [
+  { limit:   50_000, color: '#ffffb2' },
+  { limit:  100_000, color: '#fecc5c' },
+  { limit:  200_000, color: '#fd8d3c' },
+  { limit:  350_000, color: '#f03b20' },
+  { limit:  600_000, color: '#bd0026' },
+  { limit: Infinity, color: '#67001f' },
+];
+
+function getValueColor(value) {
+  const v = parseInt(value, 10);
+  if (!v || v <= 0) return '#aaaaaa';
+  for (const { limit, color } of VALUE_BREAKS) {
+    if (v < limit) return color;
+  }
+  return '#67001f';
+}
+
+function tileFeatureStyle(properties) {
+  return {
+    fill:        true,
+    fillColor:   getValueColor(properties.predicted_value),
+    fillOpacity: 0.75,
+    weight:      0.4,
+    color:       '#666',
+    opacity:     0.6,
+  };
+}
 
 // ── Boundary Configuration ────────────────────────────────────
 
@@ -125,15 +165,158 @@ function setupAutocomplete(inputId, onSelect) {
   }
 }
 
+// ── Property Tile Layer ───────────────────────────────────────
+
+let legendControl = null;
+
+const LEGEND_HTML = `
+  <div class="map-legend-title">Current Assessed Value</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#aaaaaa"></span>No data</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#ffffb2"></span>&lt; $50K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#fecc5c"></span>$50K – $100K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#fd8d3c"></span>$100K – $200K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#f03b20"></span>$200K – $350K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#bd0026"></span>$350K – $600K</div>
+  <div class="map-legend-item"><span class="map-legend-swatch" style="background:#67001f"></span>$600K+</div>
+`;
+
+function initPropertyTileLayer() {
+  propertyTileLayer = L.vectorGrid.protobuf(PROPERTY_TILE_URL, {
+    rendererFactory: L.canvas.tile,
+    vectorTileLayerStyles: {
+      [PROPERTY_LAYER_NAME]: tileFeatureStyle,
+    },
+    interactive:     true,
+    maxNativeZoom:   16,
+    getFeatureId:    f => f.properties.property_id,
+  });
+
+  propertyTileLayer.on('click', e => {
+    L.DomEvent.stopPropagation(e);
+    const tileProps = e.layer.properties;
+    if (!tileProps) return;
+
+    if (selectedTileFeatureId !== null) {
+      propertyTileLayer.resetFeatureStyle(selectedTileFeatureId);
+    }
+    selectedTileFeatureId = tileProps.property_id;
+    propertyTileLayer.setFeatureStyle(selectedTileFeatureId, {
+      fill:        true,
+      fillColor:   getValueColor(tileProps.predicted_value),
+      fillOpacity: 1.0,
+      stroke:      true,
+      weight:      2,
+      color:       '#0f4d90',
+      opacity:     1.0,
+    });
+
+    showTilePropertyCard(tileProps);
+  });
+
+  propertyTileLayer.addTo(map);
+
+  // Build the legend as a proper Leaflet control so it renders inside
+  // Leaflet's control container (immune to overflow:hidden on parent divs)
+  legendControl = L.control({ position: 'bottomleft' });
+  legendControl.onAdd = function() {
+    const div = L.DomUtil.create('div', 'map-legend');
+    div.innerHTML = LEGEND_HTML;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+  };
+  legendControl.addTo(map);
+}
+
+function showTilePropertyCard(tileProps) {
+  const addr = tileProps.address ? titleCase(tileProps.address) : '—';
+
+  document.getElementById('pcAddress').textContent       = addr;
+  document.getElementById('pcPropertyId').textContent    = tileProps.property_id || '—';
+  document.getElementById('pcAddressDetail').textContent = addr;
+  document.getElementById('pcTaxYearValue').textContent  =
+    tileProps.predicted_value != null ? fmtMoney(tileProps.predicted_value) : '—';
+  document.getElementById('pcCurrentValue').textContent  =
+    tileProps.market_value != null ? fmtMoney(tileProps.market_value) : '—';
+
+  let diffDollars = '—', diffPct = '—', diffClass = '';
+  const tyv = Number(tileProps.predicted_value);
+  const cav = Number(tileProps.market_value);
+  if (tyv && cav) {
+    const delta = cav - tyv;
+    const pct   = tyv !== 0 ? (delta / tyv) * 100 : null;
+    diffDollars = (delta >= 0 ? '+' : '') + fmtMoney(delta);
+    diffPct     = pct != null ? (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' : '—';
+    diffClass   = delta > 0 ? 'pc-positive' : delta < 0 ? 'pc-negative' : '';
+  }
+
+  const diffDolEl = document.getElementById('pcDiffDollars');
+  diffDolEl.textContent = diffDollars;
+  diffDolEl.className   = 'pc-value pc-change-dollars ' + diffClass;
+
+  const diffPctEl = document.getElementById('pcDiffPct');
+  diffPctEl.textContent = diffPct;
+  diffPctEl.className   = 'pc-value pc-change-pct ' + diffClass;
+
+  document.getElementById('cityOverviewPanel').style.display = 'none';
+  document.getElementById('propertyCardPanel').style.display = '';
+}
+
+function togglePropertyLayer(btn) {
+  propertyLayerVisible = !propertyLayerVisible;
+  if (propertyLayerVisible) {
+    propertyTileLayer.addTo(map);
+    legendControl.addTo(map);
+    btn.classList.add('active');
+  } else {
+    map.removeLayer(propertyTileLayer);
+    map.removeControl(legendControl);
+    btn.classList.remove('active');
+  }
+  if (boundaryLayer) boundaryLayer.bringToFront();
+  markers.forEach(m => m.bringToFront && m.bringToFront());
+}
+
 // ── Map ──────────────────────────────────────────────────────
 
 function initMap() {
   map = L.map('map', { center: [39.9526, -75.1652], zoom: 12 });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA',
-    subdomains: 'abcd',
-    maxZoom: 20,
-  }).addTo(map);
+
+  baseLayers.light = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA', subdomains: 'abcd', maxZoom: 20 }
+  );
+  baseLayers.dark = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    { attribution: '&copy; OpenStreetMap contributors &copy; CARTO | City of Philadelphia OPA', subdomains: 'abcd', maxZoom: 20 }
+  );
+  baseLayers.osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | City of Philadelphia OPA', maxZoom: 19 }
+  );
+  baseLayers.satellite = L.tileLayer(
+    'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    { attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS, NOAA | City of Philadelphia OPA', maxZoom: 19 }
+  );
+  baseLayers.topo = L.tileLayer(
+    'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    { attribution: '&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap | City of Philadelphia OPA', maxZoom: 17 }
+  );
+
+  currentBasemap = baseLayers.light;
+  currentBasemap.addTo(map);
+
+  initPropertyTileLayer();
+}
+
+function setBasemap(value) {
+  const next = baseLayers[value] || baseLayers.light;
+  if (next === currentBasemap) return;
+  if (currentBasemap) map.removeLayer(currentBasemap);
+  currentBasemap = next;
+  currentBasemap.addTo(map);
+  // Keep boundary and markers on top
+  if (boundaryLayer) boundaryLayer.bringToFront();
+  markers.forEach(m => m.bringToFront && m.bringToFront());
 }
 
 function clearMarkers() {
@@ -144,10 +327,9 @@ function clearMarkers() {
 function addMarkers(propList) {
   propList.forEach((prop, idx) => {
     if (!prop.lat || !prop.lng) return;
-    const color = getPropColor(prop);
     const m = L.circleMarker([prop.lat, prop.lng], {
       radius: 7, color: '#fff', weight: 2,
-      fillColor: color, fillOpacity: 0.85,
+      fillColor: '#0f4d90', fillOpacity: 0.85,
     })
       .bindPopup(buildPopup(prop), { maxWidth: 220 })
       .addTo(map);
@@ -162,17 +344,6 @@ function buildPopup(prop) {
     <div class="map-popup-pid">OPA #: ${escHtml(prop.parcel_number || 'N/A')}</div>
     <div class="map-popup-value">Value: ${fmtMoney(prop.market_value)}</div>
   </div>`;
-}
-
-function getPropColor(prop) {
-  if (overlayMode === 'type') {
-    const d = (prop.building_code_description || '').toUpperCase();
-    if (d.includes('VACANT'))                                                      return '#3a833c';
-    if (d.includes('COMMERCIAL') || d.includes('STORE') || d.includes('OFFICE'))  return '#f99300';
-    if (d.includes('INDUSTRIAL') || d.includes('GARAGE'))                         return '#888888';
-    if (d.includes('MIXED'))                                                       return '#9b59b6';
-  }
-  return '#0f4d90';
 }
 
 function fitAllMarkers() {
@@ -222,12 +393,16 @@ function selectBoundaryPolygon(layer, name) {
 }
 
 async function setBoundary(type, btn) {
+  // Increment the load ID — any in-flight fetch for a previous call will see
+  // its ID is stale and bail out, preventing layer overlap.
+  const myLoadId = ++boundaryLoadId;
+
   currentBoundaryType   = type;
   selectedBoundaryLayer = null;
   document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
 
-  // Remove existing boundary layer
+  // Remove existing boundary layer immediately (synchronous — no race here)
   if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
 
   const conf = BOUNDARY_LABELS[type] || BOUNDARY_LABELS.none;
@@ -248,6 +423,9 @@ async function setBoundary(type, btn) {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       boundaryCache[type] = await res.json();
     }
+
+    // Another setBoundary call was made while we were awaiting — discard this result
+    if (myLoadId !== boundaryLoadId) return;
 
     const geojson = boundaryCache[type];
 
@@ -284,37 +462,11 @@ async function setBoundary(type, btn) {
       names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
 
   } catch (err) {
+    if (myLoadId !== boundaryLoadId) return;
     console.error('[reviewer] setBoundary failed:', err);
     document.getElementById('filterBoundary').innerHTML =
       `<option value="">${conf.allOption}</option>`;
   }
-}
-
-// ── Legend ───────────────────────────────────────────────────
-
-function renderLegend() {
-  const LEGENDS = {
-    type: `
-      <div class="map-legend-title">Property Type</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Residential</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#f99300"></div> Commercial</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#888888"></div> Industrial</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#3a833c"></div> Vacant Land</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#9b59b6"></div> Mixed Use</div>`,
-    status: `
-      <div class="map-legend-title">Review Status</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Pending Review</div>`,
-    change: `
-      <div class="map-legend-title">Value Change</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#0f4d90"></div> Properties</div>`,
-  };
-  document.getElementById('mapLegend').innerHTML = LEGENDS[overlayMode] || LEGENDS.type;
-}
-
-function updateMapOverlay(value) {
-  overlayMode = value;
-  markers.forEach((m, i) => m.setStyle({ fillColor: getPropColor(props[i]) }));
-  renderLegend();
 }
 
 // ── Load properties ──────────────────────────────────────────
@@ -332,7 +484,6 @@ async function loadProperties(filters) {
     clearMarkers();
     addMarkers(props);
     updateStats(props);
-    renderLegend();
     if (props.length) fitAllMarkers();
     document.getElementById('mapCenter').textContent =
       props.length ? `${props.length} result${props.length !== 1 ? 's' : ''}` : 'No results';
@@ -375,9 +526,23 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  ['addressSearch', 'filterBoundary', 'filterType',
-   'valMin', 'valMax', 'filterStatus', 'changeThreshold']
+  // Cancel any in-flight boundary fetch
+  boundaryLoadId++;
+
+  // Clear form fields
+  ['addressSearch', 'filterType', 'valMin', 'valMax', 'filterStatus', 'changeThreshold']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  // Remove boundary layer from map and reset all boundary UI state
+  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+  selectedBoundaryLayer = null;
+  currentBoundaryType   = 'none';
+  document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
+  const noneBtn = document.querySelector('.boundary-btn[data-boundary="none"]');
+  if (noneBtn) noneBtn.classList.add('active');
+  document.getElementById('boundaryFilterLabel').textContent = BOUNDARY_LABELS.none.filter;
+  document.getElementById('filterBoundary').innerHTML =
+    `<option value="">${BOUNDARY_LABELS.none.allOption}</option>`;
 
   clearMarkers();
   props = [];
@@ -432,16 +597,7 @@ function selectProperty(idx, fromMap = false) {
     markers[idx].openPopup();
   }
 
-  // Switch to Overview tab and show the property card
-  switchTab('overview', document.querySelector('.tab-btn'));
   renderPropertyCard(prop);
-
-  // Populate notes tab
-  document.getElementById('notePropLabel').textContent =
-    titleCase(prop.location) + ' (OPA ' + (prop.parcel_number || 'N/A') + ')';
-  const notes = getSavedNotes();
-  document.getElementById('assessorNotes').value = notes[prop.parcel_number] || '';
-  document.getElementById('recommendedAction').value = '';
 }
 
 // ── Property card (right panel, replaces City Overview on selection) ──
@@ -489,6 +645,10 @@ function renderPropertyCard(prop) {
 }
 
 function deselectProperty() {
+  if (selectedTileFeatureId !== null && propertyTileLayer) {
+    propertyTileLayer.resetFeatureStyle(selectedTileFeatureId);
+    selectedTileFeatureId = null;
+  }
   selectedIdx = null;
   document.getElementById('propertyCardPanel').style.display = 'none';
   document.getElementById('cityOverviewPanel').style.display = '';
@@ -504,49 +664,6 @@ function updateStats(propList) {
   document.getElementById('mapCount').textContent  = count;
   document.getElementById('statCount').textContent = count;
   document.getElementById('statAvg').textContent   = count ? fmtMoney(avg) : '—';
-  document.getElementById('statFlagged').textContent = '—';
-}
-
-// ── Tabs ─────────────────────────────────────────────────────
-
-function switchTab(name, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  const pane = document.getElementById(`pane-${name}`);
-  if (pane) pane.classList.add('active');
-}
-
-// ── Notes ────────────────────────────────────────────────────
-
-function getSavedNotes() {
-  try { return JSON.parse(sessionStorage.getItem(NOTES_KEY) || '{}'); }
-  catch { return {}; }
-}
-
-function saveNote() {
-  if (selectedIdx === null) { alert('Select a property first.'); return; }
-  const prop  = props[selectedIdx];
-  const text  = document.getElementById('assessorNotes').value.trim();
-  const notes = getSavedNotes();
-  if (text) notes[prop.parcel_number] = text;
-  else delete notes[prop.parcel_number];
-  sessionStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-  alert('Note saved.');
-}
-
-function clearNote() {
-  document.getElementById('assessorNotes').value = '';
-}
-
-function submitReview() {
-  if (selectedIdx === null) { alert('Select a property first.'); return; }
-  const action = document.getElementById('recommendedAction').value;
-  if (!action) { alert('Select a recommended action.'); return; }
-  const prop = props[selectedIdx];
-  const note = document.getElementById('assessorNotes').value.trim();
-  // TODO: POST to CAMA backend when available
-  alert(`Review submitted for ${titleCase(prop.location)}.\nAction: ${action}${note ? '\nNote: ' + note : ''}`);
 }
 
 // ── Loading state ─────────────────────────────────────────────
@@ -556,11 +673,151 @@ function setLoadingState(on) {
   if (btn) { btn.textContent = on ? 'Loading…' : 'Apply Filters'; btn.disabled = on; }
 }
 
+// ── Assessment Distribution Chart ────────────────────────────
+
+const DIST_DATA_URL = 'https://storage.googleapis.com/musa5090s26-team4-public/configs/tax_year_assessment_bins.json';
+const DISPLAY_CAP   = 1_500_000;
+const TAIL_LABEL    = '≥$1.5M';
+
+let distChartInstance = null;
+let distAllData       = null;   // cached raw data
+let distActiveYear    = null;   // currently displayed year
+
+// Build {labels, counts} for a given year from raw data
+function buildChartData(rawData, year) {
+  const rows = rawData
+    .filter(r => r.tax_year === year)
+    .sort((a, b) => a.lower_bound - b.lower_bound);
+
+  const labels = [];
+  const counts = [];
+  let tailCount = 0;
+
+  for (const row of rows) {
+    if (row.lower_bound >= DISPLAY_CAP) {
+      tailCount += row.property_count;
+    } else {
+      const lo = row.lower_bound;
+      const hi = row.upper_bound;
+      labels.push(lo === 0 ? `<$${(hi / 1000).toFixed(0)}K` : `$${(lo / 1000).toFixed(0)}K`);
+      counts.push(row.property_count);
+    }
+  }
+  if (tailCount > 0) { labels.push(TAIL_LABEL); counts.push(tailCount); }
+  return { labels, counts };
+}
+
+// Switch the chart to a different year (data already loaded)
+function switchDistYear(year) {
+  distActiveYear = year;
+
+  // Update button active state
+  document.querySelectorAll('.year-btn').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.year) === year);
+  });
+
+  const { labels, counts } = buildChartData(distAllData, year);
+
+  if (distChartInstance) {
+    distChartInstance.updateOptions({
+      series:  [{ name: 'Properties', data: counts }],
+      xaxis:   { categories: labels },
+    }, false, true);
+  }
+}
+
+// Initial load: fetch data, build year buttons, render default year
+async function loadTaxYearDistribution() {
+  const msgEl = document.getElementById('ovDistMsg');
+  try {
+    const res = await fetch(DIST_DATA_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    distAllData = await res.json();
+
+    // Collect years sorted ascending; exclude years with incomplete data
+    const EXCLUDED_YEARS = new Set([2021, 2023]);
+    const countByYear = {};
+    for (const row of distAllData) {
+      if (EXCLUDED_YEARS.has(row.tax_year)) continue;
+      countByYear[row.tax_year] = (countByYear[row.tax_year] || 0) + row.property_count;
+    }
+    const sortedYears = Object.keys(countByYear).map(Number).sort((a, b) => a - b);
+    const defaultYear = sortedYears.reduce((best, y) =>
+      countByYear[y] > countByYear[best] ? y : best, sortedYears[0]);
+
+    // Build year selector buttons
+    const selectorEl = document.getElementById('yearSelector');
+    if (selectorEl) {
+      selectorEl.innerHTML = sortedYears.map(y => `
+        <button type="button"
+          class="year-btn${y === defaultYear ? ' active' : ''}"
+          data-year="${y}"
+          onclick="switchDistYear(${y})"
+          title="${countByYear[y].toLocaleString()} properties"
+        >${y}</button>`).join('');
+    }
+
+    // Remove loading placeholder and create chart
+    if (msgEl) msgEl.remove();
+    if (distChartInstance) { distChartInstance.destroy(); distChartInstance = null; }
+
+    distActiveYear = defaultYear;
+    const { labels, counts } = buildChartData(distAllData, defaultYear);
+
+    const el = document.getElementById('ovDistChart');
+    distChartInstance = new ApexCharts(el, {
+      chart: {
+        type:       'bar',
+        height:     200,
+        toolbar:    { show: false },
+        animations: { enabled: false },
+        fontFamily: 'Open Sans, sans-serif',
+      },
+      series: [{ name: 'Properties', data: counts }],
+      xaxis: {
+        categories: labels,
+        tickAmount: 10,
+        labels: {
+          rotate: -45,
+          style:  { fontSize: '9px', colors: '#555' },
+        },
+        axisBorder: { show: false },
+        axisTicks:  { show: false },
+      },
+      yaxis: {
+        labels: {
+          style:     { fontSize: '9px', colors: '#555' },
+          formatter: v => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v,
+        },
+      },
+      plotOptions: {
+        bar: { borderRadius: 1, columnWidth: '95%' },
+      },
+      dataLabels: { enabled: false },
+      colors:     ['#0f4d90'],
+      grid: {
+        borderColor:     '#e8e8e8',
+        strokeDashArray: 3,
+        xaxis:           { lines: { show: false } },
+      },
+      tooltip: {
+        followCursor: true,
+        y: { formatter: v => v.toLocaleString('en-US') + ' properties' },
+      },
+    });
+    distChartInstance.render();
+
+  } catch (err) {
+    console.error('[reviewer] loadTaxYearDistribution:', err);
+    if (msgEl) msgEl.textContent = 'Failed to load distribution data.';
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
-  renderLegend();
+  loadTaxYearDistribution();
 
   // Autocomplete: geocode the address and fly map to result, then attempt property search
   setupAutocomplete('addressSearch', prop => {
