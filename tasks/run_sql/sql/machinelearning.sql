@@ -7,20 +7,29 @@ OPTIONS (
   data_split_method = 'AUTO_SPLIT'
 ) AS
 SELECT
-  SAFE_CAST(sale_price AS FLOAT64) AS sale_price,
-  sale_date,
-  LN(SAFE_CAST(total_livable_area AS FLOAT64)) AS log_livable_area,
-  number_of_bathrooms,
-  interior_condition,
-  quality_grade,
-  garage_spaces,
-  central_air,
-  zip_code
+  SAFE_CAST(p.sale_price AS FLOAT64) AS sale_price,
+  p.sale_date,
+  LN(SAFE_CAST(p.total_livable_area AS FLOAT64)) AS log_livable_area,
+  p.number_of_bathrooms,
+  p.interior_condition,
+  p.quality_grade,
+  p.garage_spaces,
+  p.central_air,
+  p.zip_code,
 
-FROM
-  `core.opa_properties`
+  -- Census features joined from zip-level table 
+  c.median_hh_incomeE,
+  c.pct_college_educated,
+  c.pct_labor_forceE
+
+FROM `core.opa_properties` p
+LEFT JOIN `core.census_zip` c
+  ON p.zip_code = CAST(c.zip_code AS STRING)
+
 WHERE
-  SAFE_CAST(sale_price AS FLOAT64) > 5000
-  AND SAFE_CAST(sale_price AS FLOAT64) < 50000000
-  AND SAFE_CAST(total_livable_area AS FLOAT64) > 0
-  AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$');
+  SAFE_CAST(p.sale_price AS FLOAT64) > 5000
+  AND SAFE_CAST(p.sale_price AS FLOAT64) < 50000000
+  AND SAFE_CAST(p.total_livable_area AS FLOAT64) > 0
+  AND REGEXP_CONTAINS(p.quality_grade, r'^[A-Z][+-]?$')
+  AND p.category_code IN ('1', '2', '3')
+;
