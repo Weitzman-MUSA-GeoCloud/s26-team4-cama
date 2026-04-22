@@ -518,10 +518,151 @@ function setLoadingState(on) {
   if (btn) { btn.textContent = on ? 'Loading…' : 'Apply Filters'; btn.disabled = on; }
 }
 
+// ── Assessment Distribution Chart ────────────────────────────
+
+const DIST_DATA_URL = 'https://storage.googleapis.com/musa5090s26-team4-public/configs/tax_year_assessment_bins.json';
+const DISPLAY_CAP   = 1_500_000;
+const TAIL_LABEL    = '≥$1.5M';
+
+let distChartInstance = null;
+let distAllData       = null;   // cached raw data
+let distActiveYear    = null;   // currently displayed year
+
+// Build {labels, counts} for a given year from raw data
+function buildChartData(rawData, year) {
+  const rows = rawData
+    .filter(r => r.tax_year === year)
+    .sort((a, b) => a.lower_bound - b.lower_bound);
+
+  const labels = [];
+  const counts = [];
+  let tailCount = 0;
+
+  for (const row of rows) {
+    if (row.lower_bound >= DISPLAY_CAP) {
+      tailCount += row.property_count;
+    } else {
+      const lo = row.lower_bound;
+      const hi = row.upper_bound;
+      labels.push(lo === 0 ? `<$${(hi / 1000).toFixed(0)}K` : `$${(lo / 1000).toFixed(0)}K`);
+      counts.push(row.property_count);
+    }
+  }
+  if (tailCount > 0) { labels.push(TAIL_LABEL); counts.push(tailCount); }
+  return { labels, counts };
+}
+
+// Switch the chart to a different year (data already loaded)
+function switchDistYear(year) {
+  distActiveYear = year;
+
+  // Update button active state
+  document.querySelectorAll('.year-btn').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.year) === year);
+  });
+
+  const { labels, counts } = buildChartData(distAllData, year);
+
+  if (distChartInstance) {
+    distChartInstance.updateOptions({
+      series:  [{ name: 'Properties', data: counts }],
+      xaxis:   { categories: labels },
+    }, false, true);
+  }
+}
+
+// Initial load: fetch data, build year buttons, render default year
+async function loadTaxYearDistribution() {
+  const msgEl = document.getElementById('ovDistMsg');
+  try {
+    const res = await fetch(DIST_DATA_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    distAllData = await res.json();
+
+    // Collect years sorted ascending; exclude years with incomplete data
+    const EXCLUDED_YEARS = new Set([2021, 2023]);
+    const countByYear = {};
+    for (const row of distAllData) {
+      if (EXCLUDED_YEARS.has(row.tax_year)) continue;
+      countByYear[row.tax_year] = (countByYear[row.tax_year] || 0) + row.property_count;
+    }
+    const sortedYears = Object.keys(countByYear).map(Number).sort((a, b) => a - b);
+    const defaultYear = sortedYears.reduce((best, y) =>
+      countByYear[y] > countByYear[best] ? y : best, sortedYears[0]);
+
+    // Build year selector buttons
+    const selectorEl = document.getElementById('yearSelector');
+    if (selectorEl) {
+      selectorEl.innerHTML = sortedYears.map(y => `
+        <button type="button"
+          class="year-btn${y === defaultYear ? ' active' : ''}"
+          data-year="${y}"
+          onclick="switchDistYear(${y})"
+          title="${countByYear[y].toLocaleString()} properties"
+        >${y}</button>`).join('');
+    }
+
+    // Remove loading placeholder and create chart
+    if (msgEl) msgEl.remove();
+    if (distChartInstance) { distChartInstance.destroy(); distChartInstance = null; }
+
+    distActiveYear = defaultYear;
+    const { labels, counts } = buildChartData(distAllData, defaultYear);
+
+    const el = document.getElementById('ovDistChart');
+    distChartInstance = new ApexCharts(el, {
+      chart: {
+        type:       'bar',
+        height:     200,
+        toolbar:    { show: false },
+        animations: { enabled: false },
+        fontFamily: 'Open Sans, sans-serif',
+      },
+      series: [{ name: 'Properties', data: counts }],
+      xaxis: {
+        categories: labels,
+        tickAmount: 10,
+        labels: {
+          rotate: -45,
+          style:  { fontSize: '9px', colors: '#555' },
+        },
+        axisBorder: { show: false },
+        axisTicks:  { show: false },
+      },
+      yaxis: {
+        labels: {
+          style:     { fontSize: '9px', colors: '#555' },
+          formatter: v => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v,
+        },
+      },
+      plotOptions: {
+        bar: { borderRadius: 1, columnWidth: '95%' },
+      },
+      dataLabels: { enabled: false },
+      colors:     ['#0f4d90'],
+      grid: {
+        borderColor:     '#e8e8e8',
+        strokeDashArray: 3,
+        xaxis:           { lines: { show: false } },
+      },
+      tooltip: {
+        followCursor: true,
+        y: { formatter: v => v.toLocaleString('en-US') + ' properties' },
+      },
+    });
+    distChartInstance.render();
+
+  } catch (err) {
+    console.error('[reviewer] loadTaxYearDistribution:', err);
+    if (msgEl) msgEl.textContent = 'Failed to load distribution data.';
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
+  loadTaxYearDistribution();
 
   // Autocomplete: geocode the address and fly map to result, then attempt property search
   setupAutocomplete('addressSearch', prop => {

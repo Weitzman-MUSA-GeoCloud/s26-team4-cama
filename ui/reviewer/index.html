@@ -185,9 +185,12 @@
             </div>
 
             <div class="overview-chart-block">
-              <div class="overview-chart-title">Recent Tax Year · Assessed Value Distribution</div>
+              <div class="overview-chart-header">
+                <span class="overview-chart-title">Assessed Value Distribution</span>
+                <div class="year-selector" id="yearSelector"></div>
+              </div>
               <div class="overview-chart-area" id="ovDistChart">
-                <span class="overview-no-data">No data available</span>
+                <span class="overview-no-data" id="ovDistMsg">Loading…</span>
               </div>
             </div>
 
@@ -243,6 +246,7 @@
   </div><!-- /app-shell -->
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
   <script src="../js/opa-api.js"></script>
   <script src="js/script.js"></script>
 </body>
