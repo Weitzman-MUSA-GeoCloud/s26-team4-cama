@@ -379,6 +379,25 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   white-space: nowrap;
 }
 
+/* ---- Prediction chart inline legend ---- */
+.overview-chart-legend-inline {
+  font-size: 9px;
+  color: var(--phila-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pred-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* ---- Year selector ---- */
 .year-selector {
   display: flex;

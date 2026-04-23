@@ -813,11 +813,119 @@ async function loadTaxYearDistribution() {
   }
 }
 
+// ── Current − Predicted Distribution Chart ───────────────────
+
+const PRED_DATA_URL  = 'https://storage.googleapis.com/musa5090s26-team4-public/prediction_bins/current_assessment_bins.json';
+const PRED_CAP_POS   =  1_500_000;   // cap positive tail at $1.5M
+const PRED_CAP_NEG   = -1_000_000;   // cap negative tail at -$1M
+const PRED_TAIL_POS  = '≥$1.5M';
+const PRED_TAIL_NEG  = '≤-$1M';
+
+let predChartInstance = null;
+
+async function loadPredDistribution() {
+  const msgEl = document.getElementById('ovPredMsg');
+  try {
+    const res = await fetch(PRED_DATA_URL);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const raw = await res.json();
+
+    // Sort bins lowest to highest
+    const sorted = raw.slice().sort((a, b) => a.lower_bound - b.lower_bound);
+
+    const labels = [];
+    const colors = [];   // per-bar color
+    const counts = [];
+    let tailNegCount = 0;
+    let tailPosCount = 0;
+
+    for (const row of sorted) {
+      const lo = row.lower_bound;
+
+      // Merge extreme tails
+      if (lo < PRED_CAP_NEG)  { tailNegCount += row.property_count; continue; }
+      if (lo >= PRED_CAP_POS) { tailPosCount += row.property_count; continue; }
+
+      // Label: "$-50K" style for negatives, "$50K" for positives, "$0" for zero
+      let label;
+      if (lo < 0)       label = `-$${Math.abs(lo / 1000).toFixed(0)}K`;
+      else if (lo === 0) label = '$0';
+      else               label = `$${(lo / 1000).toFixed(0)}K`;
+
+      labels.push(label);
+      counts.push(row.property_count);
+      // Negative difference → current < predicted → property is under-predicted → orange/red
+      // Positive difference → current > predicted → property is over-predicted → blue
+      colors.push(lo < 0 ? '#f03b20' : '#0f4d90');
+    }
+
+    // Prepend negative tail bucket, append positive tail bucket
+    if (tailNegCount > 0) { labels.unshift(PRED_TAIL_NEG); counts.unshift(tailNegCount); colors.unshift('#f03b20'); }
+    if (tailPosCount > 0) { labels.push(PRED_TAIL_POS);    counts.push(tailPosCount);    colors.push('#0f4d90'); }
+
+    if (msgEl) msgEl.remove();
+    if (predChartInstance) { predChartInstance.destroy(); predChartInstance = null; }
+
+    const el = document.getElementById('ovPredChart');
+    predChartInstance = new ApexCharts(el, {
+      chart: {
+        type:       'bar',
+        height:     200,
+        toolbar:    { show: false },
+        animations: { enabled: false },
+        fontFamily: 'Open Sans, sans-serif',
+      },
+      series: [{ name: 'Properties', data: counts }],
+      xaxis: {
+        categories: labels,
+        tickAmount: 10,
+        labels: {
+          rotate: -45,
+          style:  { fontSize: '9px', colors: '#555' },
+        },
+        axisBorder: { show: false },
+        axisTicks:  { show: false },
+      },
+      yaxis: {
+        labels: {
+          style:     { fontSize: '9px', colors: '#555' },
+          formatter: v => v >= 1000 ? `${(v / 1000).toFixed(0)}K` : v,
+        },
+      },
+      plotOptions: {
+        bar: {
+          borderRadius:  1,
+          columnWidth:   '95%',
+          distributed:   true,   // enables per-bar color via colors array
+        },
+      },
+      colors:     colors,
+      legend:     { show: false },
+      dataLabels: { enabled: false },
+      grid: {
+        borderColor:     '#e8e8e8',
+        strokeDashArray: 3,
+        xaxis:           { lines: { show: false } },
+      },
+      tooltip: {
+        followCursor: true,
+        y: { formatter: v => v.toLocaleString('en-US') + ' properties' },
+      },
+    });
+    predChartInstance.render();
+
+  } catch (err) {
+    console.error('[reviewer] loadPredDistribution:', err);
+    if (msgEl) msgEl.textContent = 'Failed to load data.';
+  }
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initMap();
   loadTaxYearDistribution();
+  loadPredDistribution();
 
   // Autocomplete: geocode the address and fly map to result, then attempt property search
   setupAutocomplete('addressSearch', prop => {
