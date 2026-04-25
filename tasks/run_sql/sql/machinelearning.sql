@@ -8,7 +8,7 @@ OPTIONS (
 ) AS
 SELECT
   SAFE_CAST(p.sale_price AS FLOAT64) AS sale_price,
-  p.sale_date,
+  --p.sale_date,
   LN(SAFE_CAST(p.total_livable_area AS FLOAT64)) AS log_livable_area,
   p.number_of_bathrooms,
   p.interior_condition,
@@ -28,8 +28,9 @@ LEFT JOIN `core.census_zip` c
 
 WHERE
   SAFE_CAST(sale_price AS FLOAT64) > 5000
-  AND SAFE_CAST(sale_price AS FLOAT64) < 50000000
-  AND SAFE_CAST(total_livable_area AS FLOAT64) > 0
-  AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$')
+  AND SAFE_CAST(sale_price AS FLOAT64) < 2000000
+  AND SAFE_CAST(total_livable_area AS FLOAT64) > 100
+  AND LEFT(sale_date, 4) >= '2010' --learning only from more recent sales
+  --AND REGEXP_CONTAINS(quality_grade, r'^[A-Z][+-]?$')
   AND category_code IN ('1', '2', '3') --residential and mixed use
   ;
