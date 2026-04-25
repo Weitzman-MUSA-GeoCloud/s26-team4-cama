@@ -30,6 +30,7 @@ const PROPERTY_LAYER_NAME = 'property_tile_info';
 let propertyTileLayer      = null;
 let propertyLayerVisible   = true;
 let selectedTileFeatureId  = null;
+let hoverPopup             = null;
 
 // YlOrRd color ramp breakpoints for current_assessed_value
 const VALUE_BREAKS = [
@@ -189,6 +190,27 @@ function initPropertyTileLayer() {
     interactive:     true,
     maxNativeZoom:   16,
     getFeatureId:    f => f.properties.property_id,
+  });
+
+  hoverPopup = L.popup({ closeButton: false, autoPan: false, className: 'property-hover-popup' });
+
+  propertyTileLayer.on('mouseover', e => {
+    const p = e.layer.properties;
+    if (!p) return;
+    const predicted = p.predicted_value != null ? fmtMoney(p.predicted_value) : '—';
+    const market    = p.market_value    != null ? fmtMoney(parseFloat(p.market_value)) : '—';
+    hoverPopup
+      .setLatLng(e.latlng)
+      .setContent(
+        `<div class="phover-id">ID: ${p.property_id}</div>` +
+        `<div class="phover-row"><span>Predicted</span><span>${predicted}</span></div>` +
+        `<div class="phover-row"><span>Market</span><span>${market}</span></div>`
+      )
+      .openOn(map);
+  });
+
+  propertyTileLayer.on('mouseout', () => {
+    if (hoverPopup) map.closePopup(hoverPopup);
   });
 
   propertyTileLayer.on('click', e => {

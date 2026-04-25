@@ -649,3 +649,31 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   0%   { transform: scale(0.24); opacity: 0.7; }
   100% { transform: scale(1);    opacity: 0; }
 }
+
+/* ---- Property hover tooltip ---- */
+.property-hover-popup .leaflet-popup-content-wrapper {
+  background: rgba(15, 36, 68, 0.92);
+  color: white;
+  border-radius: 4px;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.property-hover-popup .leaflet-popup-content {
+  margin: 8px 10px;
+  font-size: 11px;
+  font-family: var(--font);
+  line-height: 1.6;
+}
+.property-hover-popup .leaflet-popup-tip-container { display: none; }
+.phover-id {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-bottom: 3px;
+}
+.phover-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+.phover-row span:first-child { opacity: 0.7; }
+.phover-row span:last-child  { font-weight: 700; }
