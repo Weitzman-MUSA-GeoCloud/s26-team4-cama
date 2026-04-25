@@ -632,6 +632,7 @@ const TAIL_LABEL    = '≥$1.5M';
 let distChartInstance = null;
 let distAllData       = null;   // cached raw data
 let distActiveYear    = null;   // currently displayed year
+let predAllData       = null;   // cached prediction-delta raw data
 
 // Build {labels, counts} for a given year from raw data
 function buildChartData(rawData, year) {
@@ -657,6 +658,55 @@ function buildChartData(rawData, year) {
   return { labels, counts };
 }
 
+// Compute and display the 4 City Overview KPIs from cached bin data
+function updateOverviewKPIs(year) {
+  // --- Total properties + avg assessed value from distribution bins ---
+  const rows = (distAllData || []).filter(r => r.tax_year === year);
+  let totalProps  = 0;
+  let sumAssessed = 0;
+  for (const row of rows) {
+    const mid = (row.lower_bound + row.upper_bound) / 2;
+    totalProps  += row.property_count;
+    sumAssessed += mid * row.property_count;
+  }
+  const avgAssessed = totalProps > 0 ? Math.round(sumAssessed / totalProps) : null;
+
+  // --- Avg (current − predicted) from prediction delta bins ---
+  let avgChange = null;
+  if (predAllData && predAllData.length) {
+    let sumChange      = 0;
+    let totalPredProps = 0;
+    for (const row of predAllData) {
+      const mid = (row.lower_bound + row.upper_bound) / 2;
+      totalPredProps += row.property_count;
+      sumChange      += mid * row.property_count;
+    }
+    if (totalPredProps > 0) avgChange = Math.round(sumChange / totalPredProps);
+  }
+
+  // --- Avg predicted = avg assessed − avg change ---
+  const avgPredicted = (avgAssessed !== null && avgChange !== null)
+    ? avgAssessed - avgChange : null;
+
+  // --- Update DOM ---
+  document.getElementById('ovTotalProps').textContent =
+    totalProps > 0 ? totalProps.toLocaleString('en-US') : '—';
+  document.getElementById('ovAvgAssessed').textContent =
+    avgAssessed !== null ? fmtMoney(avgAssessed) : '—';
+  document.getElementById('ovAvgPredicted').textContent =
+    avgPredicted !== null ? fmtMoney(avgPredicted) : '—';
+
+  const changeEl = document.getElementById('ovAvgChange');
+  if (avgChange !== null) {
+    changeEl.textContent  = (avgChange >= 0 ? '+' : '') + fmtMoney(avgChange);
+    changeEl.style.color  = avgChange > 0
+      ? 'var(--phila-red)' : avgChange < 0 ? 'var(--phila-green)' : '';
+  } else {
+    changeEl.textContent = '—';
+    changeEl.style.color = '';
+  }
+}
+
 // Switch the chart to a different year (data already loaded)
 function switchDistYear(year) {
   distActiveYear = year;
@@ -674,6 +724,8 @@ function switchDistYear(year) {
       xaxis:   { categories: labels },
     }, false, true);
   }
+
+  updateOverviewKPIs(year);
 }
 
 // Initial load: fetch data, build year buttons, render default year
@@ -712,6 +764,7 @@ async function loadTaxYearDistribution() {
     if (distChartInstance) { distChartInstance.destroy(); distChartInstance = null; }
 
     distActiveYear = defaultYear;
+    updateOverviewKPIs(defaultYear);
     const { labels, counts } = buildChartData(distAllData, defaultYear);
 
     const el = document.getElementById('ovDistChart');
@@ -779,6 +832,9 @@ async function loadPredDistribution() {
     const res = await fetch(PRED_DATA_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = await res.json();
+
+    predAllData = raw;
+    updateOverviewKPIs(distActiveYear);
 
     // Sort bins lowest to highest
     const sorted = raw.slice().sort((a, b) => a.lower_bound - b.lower_bound);
