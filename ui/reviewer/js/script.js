@@ -501,56 +501,6 @@ function searchAddress() {
   loadProperties({ address });
 }
 
-function applyFilters() {
-  const address     = document.getElementById('addressSearch').value.trim();
-  const boundaryVal = document.getElementById('filterBoundary').value;
-  const typeLabel   = document.getElementById('filterType').value;
-  const minVal      = document.getElementById('valMin').value.trim();
-  const maxVal      = document.getElementById('valMax').value.trim();
-
-  const filters = {};
-  if (address)     filters.address = address;
-  if (boundaryVal && currentBoundaryType !== 'none') {
-    filters.boundaryType  = currentBoundaryType;
-    filters.boundaryValue = boundaryVal;
-  }
-  if (typeLabel)   filters.buildingKeyword = typeLabel;
-  if (minVal)      filters.minValue = minVal;
-  if (maxVal)      filters.maxValue = maxVal;
-
-  if (!Object.keys(filters).length) {
-    alert('Please enter an address or select at least one filter.');
-    return;
-  }
-  loadProperties(filters);
-}
-
-function resetFilters() {
-  // Cancel any in-flight boundary fetch
-  boundaryLoadId++;
-
-  // Clear form fields
-  ['addressSearch', 'filterType', 'valMin', 'valMax', 'filterStatus', 'changeThreshold']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-
-  // Remove boundary layer from map and reset all boundary UI state
-  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
-  selectedBoundaryLayer = null;
-  currentBoundaryType   = 'none';
-  document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
-  const noneBtn = document.querySelector('.boundary-btn[data-boundary="none"]');
-  if (noneBtn) noneBtn.classList.add('active');
-  document.getElementById('boundaryFilterLabel').textContent = BOUNDARY_LABELS.none.filter;
-  document.getElementById('filterBoundary').innerHTML =
-    `<option value="">${BOUNDARY_LABELS.none.allOption}</option>`;
-
-  clearMarkers();
-  props = [];
-  selectedIdx = null;
-  updateStats([]);
-  deselectProperty();
-  document.getElementById('mapCenter').textContent = 'Philadelphia, PA';
-}
 
 // ── Property list ─────────────────────────────────────────────
 
@@ -920,6 +870,21 @@ async function loadPredDistribution() {
   }
 }
 
+// ── Zoom to selected boundary from dropdown ───────────────────
+
+function zoomToSelectedBoundary(name) {
+  if (!boundaryLayer || !name) return;
+  let match = null;
+  boundaryLayer.eachLayer(layer => {
+    if (match) return;
+    const layerName = getBoundaryDisplayName(layer.feature.properties, currentBoundaryType);
+    if (layerName === name) match = layer;
+  });
+  if (!match) return;
+  map.fitBounds(match.getBounds(), { padding: [30, 30] });
+  selectBoundaryPolygon(match, name);
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -937,5 +902,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('addressSearch').addEventListener('keydown', e => {
     if (e.key === 'Enter') searchAddress();
+  });
+
+  document.getElementById('filterBoundary').addEventListener('change', e => {
+    zoomToSelectedBoundary(e.target.value);
   });
 });

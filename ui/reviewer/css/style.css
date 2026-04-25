@@ -42,6 +42,8 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   padding: 0.9rem;
   overflow-y: auto;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---- Map area ---- */
@@ -536,3 +538,113 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 
 .pc-positive { color: var(--phila-red); }
 .pc-negative { color: var(--phila-green); }
+
+/* ---- Mayor's quote ---- */
+.mayor-quote {
+  position: relative;
+  margin: 0.6rem 0 0;
+  padding: 0.75rem 0.75rem 0.65rem 0.9rem;
+  background: var(--phila-sky);
+  border-left: 3px solid var(--phila-blue);
+  border-radius: 0 5px 5px 0;
+  overflow: hidden;
+}
+
+.mayor-quote-mark {
+  position: absolute;
+  top: -6px;
+  left: 6px;
+  font-size: 52px;
+  line-height: 1;
+  color: var(--phila-blue);
+  opacity: 0.12;
+  font-family: Georgia, serif;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mayor-quote blockquote {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--phila-text);
+  line-height: 1.6;
+  position: relative;
+}
+
+.mayor-quote figcaption {
+  margin-top: 0.45rem;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--phila-blue);
+  letter-spacing: 0.3px;
+}
+
+/* ---- Sidebar city illustration ---- */
+.sidebar-city-wrap {
+  margin-top: auto;
+  padding-top: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sidebar-skyline {
+  width: 100%;
+  border-radius: 6px;
+  animation: skylineFloat 7s ease-in-out infinite;
+  filter: drop-shadow(0 4px 10px rgba(15,77,144,0.18));
+}
+
+@keyframes skylineFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+.sidebar-city-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  color: var(--phila-text-muted);
+  opacity: 0.55;
+}
+
+/* ---- Location ping ---- */
+.sidebar-ping {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ping-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--phila-blue);
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 0 3px rgba(15,77,144,0.15);
+}
+
+.ping-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--phila-blue);
+  width: 42px;
+  height: 42px;
+  opacity: 0;
+  transform: scale(0.24);
+  animation: pingExpand 2.4s ease-out infinite;
+}
+
+.ping-ring-2 { animation-delay: 1s; }
+
+@keyframes pingExpand {
+  0%   { transform: scale(0.24); opacity: 0.7; }
+  100% { transform: scale(1);    opacity: 0; }
+}
