@@ -160,9 +160,6 @@
       <!-- CENTER: Map -->
       <div class="map-area">
         <div class="map-toolbar">
-          <span>Showing <strong id="mapCount">0</strong> properties</span>
-          <span class="toolbar-sep">|</span>
-          <span id="mapCenter">Philadelphia, PA</span>
           <!-- Boundary toggle: syncs with sidebar area filter -->
           <div class="boundary-toggle">
             <span class="boundary-label">Boundaries:</span>
@@ -181,7 +178,7 @@
               <option value="satellite">Satellite</option>
               <option value="topo">Topo</option>
             </select>
-            <button type="button" class="map-toolbar-btn" onclick="fitAllMarkers()">Fit All</button>
+
             <button type="button" class="map-toolbar-btn" onclick="locateUser()">My Location</button>
           </div>
         </div>
@@ -192,17 +189,6 @@
       <!-- RIGHT PANEL -->
       <div class="results-panel">
 
-        <!-- Stats bar -->
-        <div class="stats-bar">
-          <div class="stat-cell">
-            <div class="stat-label">Properties</div>
-            <div class="stat-value" id="statCount">0</div>
-          </div>
-          <div class="stat-cell">
-            <div class="stat-label">Avg Value</div>
-            <div class="stat-value" id="statAvg">—</div>
-          </div>
-        </div>
 
         <!-- Overview pane: City Overview by default; replaced by Property Card on selection -->
         <div id="pane-overview">
