@@ -11,7 +11,7 @@ FROM ML.PREDICT(
   (
     SELECT
       p.property_id,
-      p.sale_date,
+      --p.sale_date,
       LN(SAFE_CAST(p.total_livable_area AS FLOAT64)) AS log_livable_area,
       p.number_of_bathrooms,
       p.interior_condition,
@@ -29,8 +29,9 @@ FROM ML.PREDICT(
     LEFT JOIN `core.census_zip` c
       ON p.zip_code = CAST(c.zip_code AS STRING)
 
-    WHERE SAFE_CAST(p.total_livable_area AS FLOAT64) > 0
-      AND REGEXP_CONTAINS(p.quality_grade, r'^[A-Z][+-]?$')
+    WHERE category_code IN ('1', '2', '3') --residential and mixed use
+    AND SAFE_CAST(p.total_livable_area AS FLOAT64) > 100
+     
   )
 )
 );
