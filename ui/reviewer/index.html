@@ -60,20 +60,6 @@
           </div>
 
           <div class="form-group">
-            <label>Property Type</label>
-            <select id="filterType" title="Filter by property type">
-              <option value="">All Types</option>
-              <option>Residential (Single Family)</option>
-              <option>Residential (Multi-Family)</option>
-              <option>Commercial</option>
-              <option>Industrial</option>
-              <option>Vacant Land</option>
-              <option>Mixed Use</option>
-              <option>Tax Exempt</option>
-            </select>
-          </div>
-
-          <div class="form-group">
             <label>Assessed Value Range</label>
             <div class="two-col-grid">
               <input type="number" id="valMin" placeholder="Min $" />
@@ -81,26 +67,92 @@
             </div>
           </div>
 
-          <div class="form-group">
-            <label>Review Status</label>
-            <select id="filterStatus" title="Filter by review status">
-              <option value="">All Statuses</option>
-              <option>Pending Review</option>
-              <option>Under Appeal</option>
-              <option>Reviewed</option>
-              <option>Flagged</option>
-            </select>
+          <!-- Mayor's quote -->
+          <figure class="mayor-quote">
+            <span class="mayor-quote-mark">&#8220;</span>
+            <blockquote>Accurate property assessments ensure every Philadelphian contributes fairly to the services that strengthen our neighborhoods and uplift our communities.</blockquote>
+            <figcaption>— Mayor Cherelle L. Parker</figcaption>
+          </figure>
+
+          <!-- City illustration -->
+          <div class="sidebar-city-wrap">
+            <div class="sidebar-ping">
+              <span class="ping-ring"></span>
+              <span class="ping-ring ping-ring-2"></span>
+              <span class="ping-dot"></span>
+            </div>
+            <svg class="sidebar-skyline" viewBox="0 0 244 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="philaSky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#c8daf5"/>
+                  <stop offset="100%" stop-color="#e8f0fb"/>
+                </linearGradient>
+                <linearGradient id="philaBldg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#2176d2"/>
+                  <stop offset="100%" stop-color="#08274a"/>
+                </linearGradient>
+              </defs>
+              <!-- Sky -->
+              <rect width="244" height="88" rx="6" fill="url(#philaSky)"/>
+              <!-- Ground -->
+              <rect x="0" y="80" width="244" height="8" fill="#0f4d90" opacity="0.2"/>
+              <!-- Left cluster -->
+              <rect x="0"  y="70" width="10" height="10" fill="#0f4d90" opacity="0.38"/>
+              <rect x="11" y="64" width="9"  height="16" fill="#0f4d90" opacity="0.42"/>
+              <rect x="21" y="72" width="12" height="8"  fill="#0f4d90" opacity="0.35"/>
+              <!-- City Hall body -->
+              <rect x="35" y="68" width="24" height="12" fill="#0f4d90" opacity="0.60"/>
+              <!-- City Hall tower -->
+              <rect x="44" y="52" width="7"  height="16" fill="#0f4d90" opacity="0.65"/>
+              <!-- City Hall crown -->
+              <polygon points="44,52 47.5,45 51,52" fill="#0f4d90" opacity="0.70"/>
+              <!-- William Penn (tiny) -->
+              <rect x="47" y="41" width="1.5" height="4" fill="#0f4d90" opacity="0.80"/>
+              <!-- Mid buildings -->
+              <rect x="61" y="62" width="14" height="18" fill="#0f4d90" opacity="0.52"/>
+              <rect x="76" y="67" width="9"  height="13" fill="#0f4d90" opacity="0.48"/>
+              <!-- One Liberty Place body -->
+              <rect x="87" y="28" width="20" height="52" fill="url(#philaBldg)" opacity="0.88"/>
+              <!-- One Liberty crown + spire -->
+              <polygon points="87,28 97,8 107,28" fill="#2176d2" opacity="0.88"/>
+              <rect x="96.5" y="2" width="1.5" height="6" fill="#0f4d90" opacity="0.85"/>
+              <!-- One Liberty windows -->
+              <rect x="90"  y="32" width="3" height="2" fill="white" opacity="0.70"/>
+              <rect x="100" y="32" width="3" height="2" fill="white" opacity="0.40"/>
+              <rect x="90"  y="38" width="3" height="2" fill="white" opacity="0.55"/>
+              <rect x="100" y="38" width="3" height="2" fill="white" opacity="0.70"/>
+              <rect x="90"  y="44" width="3" height="2" fill="white" opacity="0.70"/>
+              <rect x="100" y="44" width="3" height="2" fill="white" opacity="0.30"/>
+              <rect x="90"  y="50" width="3" height="2" fill="white" opacity="0.50"/>
+              <rect x="100" y="50" width="3" height="2" fill="white" opacity="0.70"/>
+              <!-- Two Liberty Place -->
+              <rect x="109" y="32" width="16" height="48" fill="url(#philaBldg)" opacity="0.78"/>
+              <polygon points="109,32 117,18 125,32" fill="#2176d2" opacity="0.78"/>
+              <rect x="116.5" y="12" width="1.5" height="6" fill="#0f4d90" opacity="0.75"/>
+              <!-- Two Liberty windows -->
+              <rect x="112" y="36" width="3" height="2" fill="white" opacity="0.50"/>
+              <rect x="118" y="36" width="3" height="2" fill="white" opacity="0.60"/>
+              <rect x="112" y="43" width="3" height="2" fill="white" opacity="0.40"/>
+              <rect x="118" y="43" width="3" height="2" fill="white" opacity="0.55"/>
+              <!-- Comcast Center -->
+              <rect x="127" y="35" width="16" height="45" fill="url(#philaBldg)" opacity="0.73"/>
+              <polygon points="127,35 135,24 143,35" fill="#2176d2" opacity="0.73"/>
+              <!-- Comcast windows -->
+              <rect x="130" y="40" width="3" height="2" fill="white" opacity="0.45"/>
+              <rect x="136" y="40" width="3" height="2" fill="white" opacity="0.50"/>
+              <rect x="130" y="47" width="3" height="2" fill="white" opacity="0.55"/>
+              <rect x="136" y="47" width="3" height="2" fill="white" opacity="0.30"/>
+              <!-- Right mid-rises -->
+              <rect x="145" y="52" width="14" height="28" fill="#0f4d90" opacity="0.60"/>
+              <rect x="160" y="57" width="12" height="23" fill="#0f4d90" opacity="0.55"/>
+              <rect x="173" y="62" width="14" height="18" fill="#0f4d90" opacity="0.50"/>
+              <rect x="188" y="65" width="12" height="15" fill="#0f4d90" opacity="0.45"/>
+              <rect x="201" y="68" width="14" height="12" fill="#0f4d90" opacity="0.40"/>
+              <rect x="216" y="71" width="12" height="9"  fill="#0f4d90" opacity="0.38"/>
+              <rect x="229" y="73" width="15" height="7"  fill="#0f4d90" opacity="0.33"/>
+            </svg>
+            <span class="sidebar-city-label">Philadelphia, PA</span>
           </div>
-
-          <div class="form-group">
-            <label>Min Change Threshold (%)</label>
-            <input type="number" id="changeThreshold" placeholder="e.g. 15 for &gt;15% change" />
-          </div>
-
-          <div class="divider"></div>
-
-          <button type="button" class="btn btn-primary w-100" onclick="applyFilters()">Apply Filters</button>
-          <button type="button" class="btn btn-secondary w-100 mt-1" onclick="resetFilters()">Reset All</button>
 
         </div>
       </aside>
@@ -108,9 +160,6 @@
       <!-- CENTER: Map -->
       <div class="map-area">
         <div class="map-toolbar">
-          <span>Showing <strong id="mapCount">0</strong> properties</span>
-          <span class="toolbar-sep">|</span>
-          <span id="mapCenter">Philadelphia, PA</span>
           <!-- Boundary toggle: syncs with sidebar area filter -->
           <div class="boundary-toggle">
             <span class="boundary-label">Boundaries:</span>
@@ -129,7 +178,7 @@
               <option value="satellite">Satellite</option>
               <option value="topo">Topo</option>
             </select>
-            <button type="button" class="map-toolbar-btn" onclick="fitAllMarkers()">Fit All</button>
+
             <button type="button" class="map-toolbar-btn" onclick="locateUser()">My Location</button>
           </div>
         </div>
@@ -140,17 +189,6 @@
       <!-- RIGHT PANEL -->
       <div class="results-panel">
 
-        <!-- Stats bar -->
-        <div class="stats-bar">
-          <div class="stat-cell">
-            <div class="stat-label">Properties</div>
-            <div class="stat-value" id="statCount">0</div>
-          </div>
-          <div class="stat-cell">
-            <div class="stat-label">Avg Value</div>
-            <div class="stat-value" id="statAvg">—</div>
-          </div>
-        </div>
 
         <!-- Overview pane: City Overview by default; replaced by Property Card on selection -->
         <div id="pane-overview">
@@ -175,14 +213,6 @@
               <div class="overview-kpi">
                 <div class="overview-kpi-label">Avg Change</div>
                 <div class="overview-kpi-value" id="ovAvgChange">—</div>
-              </div>
-              <div class="overview-kpi">
-                <div class="overview-kpi-label">Assmt Increases</div>
-                <div class="overview-kpi-value" id="ovIncreases">—</div>
-              </div>
-              <div class="overview-kpi">
-                <div class="overview-kpi-label">High-Change / Anomaly</div>
-                <div class="overview-kpi-value" id="ovHighChange">—</div>
               </div>
             </div>
 

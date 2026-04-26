@@ -30,6 +30,7 @@ const PROPERTY_LAYER_NAME = 'property_tile_info';
 let propertyTileLayer      = null;
 let propertyLayerVisible   = true;
 let selectedTileFeatureId  = null;
+let hoverPopup             = null;
 
 // YlOrRd color ramp breakpoints for current_assessed_value
 const VALUE_BREAKS = [
@@ -189,6 +190,27 @@ function initPropertyTileLayer() {
     interactive:     true,
     maxNativeZoom:   16,
     getFeatureId:    f => f.properties.property_id,
+  });
+
+  hoverPopup = L.popup({ closeButton: false, autoPan: false, className: 'property-hover-popup' });
+
+  propertyTileLayer.on('mouseover', e => {
+    const p = e.layer.properties;
+    if (!p) return;
+    const predicted = p.predicted_value != null ? fmtMoney(p.predicted_value) : '—';
+    const market    = p.market_value    != null ? fmtMoney(parseFloat(p.market_value)) : '—';
+    hoverPopup
+      .setLatLng(e.latlng)
+      .setContent(
+        `<div class="phover-id">ID: ${p.property_id}</div>` +
+        `<div class="phover-row"><span>Predicted</span><span>${predicted}</span></div>` +
+        `<div class="phover-row"><span>Market</span><span>${market}</span></div>`
+      )
+      .openOn(map);
+  });
+
+  propertyTileLayer.on('mouseout', () => {
+    if (hoverPopup) map.closePopup(hoverPopup);
   });
 
   propertyTileLayer.on('click', e => {
@@ -501,56 +523,6 @@ function searchAddress() {
   loadProperties({ address });
 }
 
-function applyFilters() {
-  const address     = document.getElementById('addressSearch').value.trim();
-  const boundaryVal = document.getElementById('filterBoundary').value;
-  const typeLabel   = document.getElementById('filterType').value;
-  const minVal      = document.getElementById('valMin').value.trim();
-  const maxVal      = document.getElementById('valMax').value.trim();
-
-  const filters = {};
-  if (address)     filters.address = address;
-  if (boundaryVal && currentBoundaryType !== 'none') {
-    filters.boundaryType  = currentBoundaryType;
-    filters.boundaryValue = boundaryVal;
-  }
-  if (typeLabel)   filters.buildingKeyword = typeLabel;
-  if (minVal)      filters.minValue = minVal;
-  if (maxVal)      filters.maxValue = maxVal;
-
-  if (!Object.keys(filters).length) {
-    alert('Please enter an address or select at least one filter.');
-    return;
-  }
-  loadProperties(filters);
-}
-
-function resetFilters() {
-  // Cancel any in-flight boundary fetch
-  boundaryLoadId++;
-
-  // Clear form fields
-  ['addressSearch', 'filterType', 'valMin', 'valMax', 'filterStatus', 'changeThreshold']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-
-  // Remove boundary layer from map and reset all boundary UI state
-  if (boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
-  selectedBoundaryLayer = null;
-  currentBoundaryType   = 'none';
-  document.querySelectorAll('.boundary-btn').forEach(b => b.classList.remove('active'));
-  const noneBtn = document.querySelector('.boundary-btn[data-boundary="none"]');
-  if (noneBtn) noneBtn.classList.add('active');
-  document.getElementById('boundaryFilterLabel').textContent = BOUNDARY_LABELS.none.filter;
-  document.getElementById('filterBoundary').innerHTML =
-    `<option value="">${BOUNDARY_LABELS.none.allOption}</option>`;
-
-  clearMarkers();
-  props = [];
-  selectedIdx = null;
-  updateStats([]);
-  deselectProperty();
-  document.getElementById('mapCenter').textContent = 'Philadelphia, PA';
-}
 
 // ── Property list ─────────────────────────────────────────────
 
@@ -682,6 +654,7 @@ const TAIL_LABEL    = '≥$1.5M';
 let distChartInstance = null;
 let distAllData       = null;   // cached raw data
 let distActiveYear    = null;   // currently displayed year
+let predAllData       = null;   // cached prediction-delta raw data
 
 // Build {labels, counts} for a given year from raw data
 function buildChartData(rawData, year) {
@@ -707,6 +680,55 @@ function buildChartData(rawData, year) {
   return { labels, counts };
 }
 
+// Compute and display the 4 City Overview KPIs from cached bin data
+function updateOverviewKPIs(year) {
+  // --- Total properties + avg assessed value from distribution bins ---
+  const rows = (distAllData || []).filter(r => r.tax_year === year);
+  let totalProps  = 0;
+  let sumAssessed = 0;
+  for (const row of rows) {
+    const mid = (row.lower_bound + row.upper_bound) / 2;
+    totalProps  += row.property_count;
+    sumAssessed += mid * row.property_count;
+  }
+  const avgAssessed = totalProps > 0 ? Math.round(sumAssessed / totalProps) : null;
+
+  // --- Avg (current − predicted) from prediction delta bins ---
+  let avgChange = null;
+  if (predAllData && predAllData.length) {
+    let sumChange      = 0;
+    let totalPredProps = 0;
+    for (const row of predAllData) {
+      const mid = (row.lower_bound + row.upper_bound) / 2;
+      totalPredProps += row.property_count;
+      sumChange      += mid * row.property_count;
+    }
+    if (totalPredProps > 0) avgChange = Math.round(sumChange / totalPredProps);
+  }
+
+  // --- Avg predicted = avg assessed − avg change ---
+  const avgPredicted = (avgAssessed !== null && avgChange !== null)
+    ? avgAssessed - avgChange : null;
+
+  // --- Update DOM ---
+  document.getElementById('ovTotalProps').textContent =
+    totalProps > 0 ? totalProps.toLocaleString('en-US') : '—';
+  document.getElementById('ovAvgAssessed').textContent =
+    avgAssessed !== null ? fmtMoney(avgAssessed) : '—';
+  document.getElementById('ovAvgPredicted').textContent =
+    avgPredicted !== null ? fmtMoney(avgPredicted) : '—';
+
+  const changeEl = document.getElementById('ovAvgChange');
+  if (avgChange !== null) {
+    changeEl.textContent  = (avgChange >= 0 ? '+' : '') + fmtMoney(avgChange);
+    changeEl.style.color  = avgChange > 0
+      ? 'var(--phila-red)' : avgChange < 0 ? 'var(--phila-green)' : '';
+  } else {
+    changeEl.textContent = '—';
+    changeEl.style.color = '';
+  }
+}
+
 // Switch the chart to a different year (data already loaded)
 function switchDistYear(year) {
   distActiveYear = year;
@@ -724,6 +746,8 @@ function switchDistYear(year) {
       xaxis:   { categories: labels },
     }, false, true);
   }
+
+  updateOverviewKPIs(year);
 }
 
 // Initial load: fetch data, build year buttons, render default year
@@ -762,6 +786,7 @@ async function loadTaxYearDistribution() {
     if (distChartInstance) { distChartInstance.destroy(); distChartInstance = null; }
 
     distActiveYear = defaultYear;
+    updateOverviewKPIs(defaultYear);
     const { labels, counts } = buildChartData(distAllData, defaultYear);
 
     const el = document.getElementById('ovDistChart');
@@ -829,6 +854,9 @@ async function loadPredDistribution() {
     const res = await fetch(PRED_DATA_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const raw = await res.json();
+
+    predAllData = raw;
+    updateOverviewKPIs(distActiveYear);
 
     // Sort bins lowest to highest
     const sorted = raw.slice().sort((a, b) => a.lower_bound - b.lower_bound);
@@ -920,6 +948,21 @@ async function loadPredDistribution() {
   }
 }
 
+// ── Zoom to selected boundary from dropdown ───────────────────
+
+function zoomToSelectedBoundary(name) {
+  if (!boundaryLayer || !name) return;
+  let match = null;
+  boundaryLayer.eachLayer(layer => {
+    if (match) return;
+    const layerName = getBoundaryDisplayName(layer.feature.properties, currentBoundaryType);
+    if (layerName === name) match = layer;
+  });
+  if (!match) return;
+  map.fitBounds(match.getBounds(), { padding: [30, 30] });
+  selectBoundaryPolygon(match, name);
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -937,5 +980,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('addressSearch').addEventListener('keydown', e => {
     if (e.key === 'Enter') searchAddress();
+  });
+
+  document.getElementById('filterBoundary').addEventListener('change', e => {
+    zoomToSelectedBoundary(e.target.value);
   });
 });

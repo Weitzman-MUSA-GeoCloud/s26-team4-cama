@@ -42,6 +42,8 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   padding: 0.9rem;
   overflow-y: auto;
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---- Map area ---- */
@@ -68,32 +70,33 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 
 .map-toolbar-actions {
   display: flex;
+  align-items: center;
   gap: 0.4rem;
 }
 
 .map-toolbar-btn {
-  padding: 0.2rem 0.6rem;
-  background: rgba(255,255,255,0.15);
-  color: white;
-  border: 1px solid rgba(255,255,255,0.25);
+  padding: 0.18rem 0.5rem;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 3px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
 
-.map-toolbar-btn:hover { background: rgba(255,255,255,0.28); }
+.map-toolbar-btn:hover { background: rgba(255,255,255,0.22); color: white; }
 
 .basemap-select {
-  padding: 0.18rem 0.45rem;
-  background: rgba(255,255,255,0.12);
-  color: white;
-  border: 1px solid rgba(255,255,255,0.25);
+  padding: 0.18rem 0.5rem;
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 3px;
   font-family: var(--font);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   appearance: none;
@@ -536,3 +539,141 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
 
 .pc-positive { color: var(--phila-red); }
 .pc-negative { color: var(--phila-green); }
+
+/* ---- Mayor's quote ---- */
+.mayor-quote {
+  position: relative;
+  margin: 0.6rem 0 0;
+  padding: 0.75rem 0.75rem 0.65rem 0.9rem;
+  background: var(--phila-sky);
+  border-left: 3px solid var(--phila-blue);
+  border-radius: 0 5px 5px 0;
+  overflow: hidden;
+}
+
+.mayor-quote-mark {
+  position: absolute;
+  top: -6px;
+  left: 6px;
+  font-size: 52px;
+  line-height: 1;
+  color: var(--phila-blue);
+  opacity: 0.12;
+  font-family: Georgia, serif;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.mayor-quote blockquote {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--phila-text);
+  line-height: 1.6;
+  position: relative;
+}
+
+.mayor-quote figcaption {
+  margin-top: 0.45rem;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--phila-blue);
+  letter-spacing: 0.3px;
+}
+
+/* ---- Sidebar city illustration ---- */
+.sidebar-city-wrap {
+  margin-top: auto;
+  padding-top: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.sidebar-skyline {
+  width: 100%;
+  border-radius: 6px;
+  animation: skylineFloat 7s ease-in-out infinite;
+  filter: drop-shadow(0 4px 10px rgba(15,77,144,0.18));
+}
+
+@keyframes skylineFloat {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+.sidebar-city-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  color: var(--phila-text-muted);
+  opacity: 0.55;
+}
+
+/* ---- Location ping ---- */
+.sidebar-ping {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ping-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--phila-blue);
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+  box-shadow: 0 0 0 3px rgba(15,77,144,0.15);
+}
+
+.ping-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid var(--phila-blue);
+  width: 42px;
+  height: 42px;
+  opacity: 0;
+  transform: scale(0.24);
+  animation: pingExpand 2.4s ease-out infinite;
+}
+
+.ping-ring-2 { animation-delay: 1s; }
+
+@keyframes pingExpand {
+  0%   { transform: scale(0.24); opacity: 0.7; }
+  100% { transform: scale(1);    opacity: 0; }
+}
+
+/* ---- Property hover tooltip ---- */
+.property-hover-popup .leaflet-popup-content-wrapper {
+  background: rgba(15, 36, 68, 0.92);
+  color: white;
+  border-radius: 4px;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.property-hover-popup .leaflet-popup-content {
+  margin: 8px 10px;
+  font-size: 11px;
+  font-family: var(--font);
+  line-height: 1.6;
+}
+.property-hover-popup .leaflet-popup-tip-container { display: none; }
+.phover-id {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-bottom: 3px;
+}
+.phover-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+.phover-row span:first-child { opacity: 0.7; }
+.phover-row span:last-child  { font-weight: 700; }
