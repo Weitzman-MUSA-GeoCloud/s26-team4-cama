@@ -12,7 +12,7 @@ ogr2ogr \
   -dsco MINZOOM=12 \
   -dsco MAXZOOM=18 \
   -dsco COMPRESS=YES \
-  -dsco MAX_SIZE=1000000
+  -dsco MAX_SIZE=2000000 \
   ./properties \
   ./property_tile_info.geojson
 
