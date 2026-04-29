@@ -437,6 +437,82 @@ html, body { height: 100%; display: flex; flex-direction: column; }
 
 .hc-row:not(.self) .hc-bar span { color: var(--phila-text); }
 
+/* ---- Property tile legend (rendered as a Leaflet control) ---- */
+.map-legend {
+  background: rgba(255, 255, 255, 0.93);
+  border: 1px solid var(--phila-border);
+  border-radius: 4px;
+  padding: 0.45rem 0.6rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  min-width: 130px;
+}
+
+.map-legend-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--phila-text-muted);
+  margin-bottom: 0.35rem;
+}
+
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.38rem;
+  margin-bottom: 0.18rem;
+  font-size: 10px;
+  color: var(--phila-text);
+}
+
+.map-legend-item:last-child { margin-bottom: 0; }
+
+.map-legend-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+/* ---- Property hover popup ---- */
+/* pointer-events:none lets clicks pass through to the tile layer below */
+.property-hover-popup .leaflet-popup-content-wrapper,
+.property-hover-popup .leaflet-popup-tip-container,
+.property-hover-popup .leaflet-popup-tip {
+  pointer-events: none;
+}
+.property-hover-popup .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+  padding: 0.35rem 0.55rem;
+}
+
+.property-hover-popup .leaflet-popup-content {
+  margin: 0;
+  font-size: 11px;
+  color: var(--phila-text);
+  min-width: 130px;
+}
+
+.property-hover-popup .leaflet-popup-tip-container { display: none; }
+
+.phover-id {
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--phila-blue);
+  margin-bottom: 0.2rem;
+}
+
+.phover-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 11px;
+}
+
 /* ============================================================
    MAP POPUP
    ============================================================ */

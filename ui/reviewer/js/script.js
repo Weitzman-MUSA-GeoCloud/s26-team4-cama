@@ -301,7 +301,7 @@ function togglePropertyLayer(btn) {
 // ── Map ──────────────────────────────────────────────────────
 
 function initMap() {
-  map = L.map('map', { center: [39.9526, -75.1652], zoom: 12 });
+  map = L.map('map', { center: [39.9526, -75.1652], zoom: 12, minZoom: 12, maxZoom: 18 });
 
   baseLayers.light = L.tileLayer(
     'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
