@@ -2,7 +2,7 @@
 //  Property Owner Widget — script.js
 //  City of Philadelphia — Office of Property Assessment
 //
-//  Depends on: Leaflet, ../js/opa-api.js (OPA object)
+//  Depends on: Leaflet
 // ============================================================
 
 'use strict';
@@ -16,7 +16,7 @@ const ADDRESS_ZOOM = 17;
 const PROPERTY_TILE_URL   = 'https://storage.googleapis.com/musa5090s26-team4-public/tiles/properties/{z}/{x}/{y}.pbf';
 const PROPERTY_LAYER_NAME = 'property_tile_info';
 
-let propertyTileLayer = null;
+let propertyTileLayer  = null;
 let propertyHoverPopup = null;
 
 const VALUE_BREAKS = [
@@ -80,11 +80,6 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function debounce(fn, ms) {
-  let t;
-  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-
 // ── Map ──────────────────────────────────────────────────────
 
 function initMap() {
@@ -132,24 +127,12 @@ function initPropertyTileLayer() {
 
   propertyTileLayer.on('click', e => {
     L.DomEvent.stopPropagation(e);
-    const tileProps = e.layer.properties;
-    if (!tileProps) return;
+    const tileProps = (e.layer && e.layer.properties) || {};
 
     if (propertyHoverPopup) widgetMap.closePopup(propertyHoverPopup);
 
-    const prop = {
-      location:        tileProps.address || '',
-      lat:             e.latlng.lat,
-      lng:             e.latlng.lng,
-      parcel_number:   String(tileProps.property_id || ''),
-      market_value:    tileProps.market_value    != null ? parseFloat(tileProps.market_value)    : null,
-      predicted_value: tileProps.predicted_value != null ? parseFloat(tileProps.predicted_value) : null,
-    };
-
-    clearError();
-    placeMapMarker(prop);
-    populateSummary(prop);
-    if (prop.location) el('propertySearch').value = titleCase(prop.location);
+    populateSummary(tileProps);
+    placeMapMarker(tileProps, e.latlng);
   });
 
   propertyTileLayer.addTo(widgetMap);
@@ -164,126 +147,22 @@ function initPropertyTileLayer() {
   legendControl.addTo(widgetMap);
 }
 
-// ── Autocomplete ─────────────────────────────────────────────
-
-function setupAutocomplete(inputId, onSelect) {
-  const input    = el(inputId);
-  const wrap     = input.closest('.search-input-wrap');
-  const dropdown = document.createElement('ul');
-  dropdown.className = 'autocomplete-list';
-  wrap.appendChild(dropdown);
-
-  let currentResults = [];
-
-  const suggest = debounce(async (query) => {
-    if (query.length < 6) { closeDropdown(); return; }
-
-    dropdown.innerHTML = '<li class="autocomplete-status">Searching…</li>';
-    dropdown.classList.add('open');
-
-    try {
-      const results = await OPA.searchByAddress(query, 8);
-      currentResults = results;
-
-      if (!results.length) {
-        dropdown.innerHTML = '<li class="autocomplete-status">No addresses found.</li>';
-        return;
-      }
-
-      dropdown.innerHTML = results.map((prop, i) => `
-        <li class="autocomplete-item" data-idx="${i}" tabindex="0">
-          <span class="autocomplete-item-addr">${escHtml(titleCase(prop.location))}</span>
-          <span class="autocomplete-item-zip">${escHtml(prop.zip_code || '')}</span>
-        </li>`).join('');
-
-      dropdown.querySelectorAll('.autocomplete-item').forEach(li => {
-        li.addEventListener('mousedown', e => {
-          // mousedown fires before blur, so preventDefault keeps focus
-          e.preventDefault();
-          const prop = currentResults[parseInt(li.dataset.idx, 10)];
-          input.value = titleCase(prop.location);
-          closeDropdown();
-          onSelect(prop);
-        });
-      });
-
-    } catch {
-      dropdown.innerHTML = '<li class="autocomplete-status">Error loading suggestions.</li>';
-    }
-  }, 320);
-
-  input.addEventListener('input', () => suggest(input.value.trim()));
-
-  input.addEventListener('blur', () => {
-    // Slight delay so mousedown on item fires first
-    setTimeout(closeDropdown, 150);
-  });
-
-  // Close on Escape
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeDropdown();
-  });
-
-  function closeDropdown() {
-    dropdown.classList.remove('open');
-    dropdown.innerHTML = '';
-    currentResults = [];
-  }
-}
-
-// ── Search ───────────────────────────────────────────────────
-
-// Called when user types and hits Enter, or clicks Search button.
-// Search is just a navigation aid — values populate when the user
-// clicks the property's tile on the map.
-async function lookupProperty(preloadedProp) {
-  if (preloadedProp) {
-    processProp(preloadedProp);
-    return;
-  }
-
-  const address = el('propertySearch').value.trim();
-  if (!address) return;
-
-  setSearchState(true);
-  clearError();
-
-  try {
-    const results = await OPA.searchByAddress(address, 1);
-    if (!results.length) {
-      showError('No property found. Try a different format, e.g. "1500 Market St".');
-      setSearchState(false);
-      return;
-    }
-    processProp(results[0]);
-  } catch (err) {
-    showError('Could not load property data. Please try again.');
-    console.error('[widget] lookupProperty:', err);
-    setSearchState(false);
-  }
-}
-
-// Core flow once we have a property record
-function processProp(prop) {
-  placeMapMarker(prop);
-  populateSummary(prop);
-  setSearchState(false);
-}
-
 // ── Map marker ───────────────────────────────────────────────
 
-function placeMapMarker(prop) {
+function placeMapMarker(tileProps, latlng) {
+  if (!latlng) return;
   if (widgetMarker) widgetMarker.remove();
-  const owner = prop.owner_1 ? `<div class="map-popup-owner">${escHtml(titleCase(prop.owner_1))}</div>` : '';
-  const value = prop.market_value ? `<div class="map-popup-value">Assessed: ${fmtMoney(prop.market_value)}</div>` : '';
-  widgetMarker = L.marker([prop.lat, prop.lng])
+  const address = tileProps.address ? titleCase(tileProps.address) : '';
+  const market  = tileProps.market_value != null ? fmtMoney(tileProps.market_value) : null;
+  const value   = market ? `<div class="map-popup-value">Market: ${market}</div>` : '';
+  widgetMarker = L.marker(latlng)
     .bindPopup(
-      `<div class="map-popup-address">${escHtml(titleCase(prop.location))}</div>${owner}${value}`,
+      `<div class="map-popup-address">${escHtml(address || '—')}</div>${value}`,
       { maxWidth: 260 }
     )
     .addTo(widgetMap)
     .openPopup();
-  widgetMap.flyTo([prop.lat, prop.lng], ADDRESS_ZOOM, { duration: 0.8 });
+  widgetMap.flyTo(latlng, ADDRESS_ZOOM, { duration: 0.8 });
   el('clearMarkerBtn').style.display = 'inline-block';
 }
 
@@ -297,20 +176,22 @@ function clearMarker() {
 
 // ── Summary card ─────────────────────────────────────────────
 
-function populateSummary(prop) {
-  el('summaryAddress').textContent =
-    (titleCase(prop.location) || '—') + (prop.zip_code ? ', Philadelphia PA ' + prop.zip_code : '');
+function populateSummary(tileProps) {
+  const address = tileProps.address ? titleCase(tileProps.address) : '—';
 
-  el('summaryPid').textContent = 'Property ID: ' + (prop.parcel_number || '—');
+  el('summaryAddress').textContent = address;
+  el('summaryPid').textContent     = 'Property ID: ' + (tileProps.property_id != null ? tileProps.property_id : '—');
 
-  const assessed = prop.predicted_value != null ? parseFloat(prop.predicted_value) : null;
-  const market   = prop.market_value    != null ? parseFloat(prop.market_value)    : null;
+  const assessed = Number(tileProps.predicted_value);
+  const market   = Number(tileProps.market_value);
+  const hasAssessed = Number.isFinite(assessed) && assessed > 0;
+  const hasMarket   = Number.isFinite(market)   && market   > 0;
 
-  el('summaryAssessedValue').textContent = assessed != null ? fmtMoney(assessed) : '—';
-  el('summaryMarketValue').textContent   = market   != null ? fmtMoney(market)   : '—';
+  el('summaryAssessedValue').textContent = hasAssessed ? fmtMoney(assessed) : '—';
+  el('summaryMarketValue').textContent   = hasMarket   ? fmtMoney(market)   : '—';
 
   const insight = el('summaryInsight');
-  if (assessed != null && market != null && market > 0) {
+  if (hasAssessed && hasMarket) {
     const diff = assessed - market;
     const pct  = Math.round((diff / market) * 100);
     const tag  = diff >= 0
@@ -323,38 +204,6 @@ function populateSummary(prop) {
   }
 }
 
-// ── UI state helpers ──────────────────────────────────────────
-
-function setSearchState(loading) {
-  const btn = el('searchBtn');
-  btn.textContent = loading ? 'Searching…' : 'Search';
-  btn.disabled    = loading;
-}
-
-function showError(msg) {
-  const div = el('searchError');
-  div.textContent   = msg;
-  div.style.display = 'block';
-}
-
-function clearError() {
-  const div = el('searchError');
-  div.textContent   = '';
-  div.style.display = 'none';
-}
-
 // ── Init ─────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => {
-  initMap();
-
-  // Wire up autocomplete: on selection immediately run the full lookup
-  setupAutocomplete('propertySearch', prop => {
-    clearError();
-    processProp(prop);
-  });
-
-  el('propertySearch').addEventListener('keydown', e => {
-    if (e.key === 'Enter') lookupProperty();
-  });
-});
+document.addEventListener('DOMContentLoaded', initMap);
