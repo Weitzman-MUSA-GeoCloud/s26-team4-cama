@@ -401,6 +401,14 @@ html, body { height: 100%; overflow: hidden; display: flex; flex-direction: colu
   flex-shrink: 0;
 }
 
+.pred-chart-note {
+  font-size: 9px;
+  color: var(--phila-text-muted);
+  font-style: italic;
+  margin: 0.25rem 0 0;
+  line-height: 1.4;
+}
+
 /* ---- Year selector ---- */
 .year-selector {
   display: flex;
