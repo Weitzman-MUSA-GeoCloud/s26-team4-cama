@@ -80,6 +80,64 @@ function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// ── Census geocoder ──────────────────────────────────────────
+// Docs: https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html
+// No API key required. The endpoint does not send CORS headers, so we
+// load it via JSONP (script-tag injection with a callback name).
+const CENSUS_GEOCODER_URL =
+  'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress';
+
+function jsonp(url, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const cbName  = '__census_cb_' + Math.random().toString(36).slice(2);
+    const fullUrl = url + (url.includes('?') ? '&' : '?') + 'callback=' + cbName;
+    const script  = document.createElement('script');
+    let timer;
+    const cleanup = () => {
+      delete window[cbName];
+      script.remove();
+      clearTimeout(timer);
+    };
+    window[cbName] = data => { cleanup(); resolve(data); };
+    script.onerror = () => { cleanup(); reject(new Error('JSONP load failed')); };
+    timer = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, timeoutMs);
+    script.src = fullUrl;
+    document.head.appendChild(script);
+  });
+}
+
+async function censusGeocode(query, limit = 8) {
+  if (!query) return [];
+  const params = new URLSearchParams({
+    address:   query + ', Philadelphia, PA',
+    benchmark: 'Public_AR_Current',
+    format:    'json',
+  });
+  const data = await jsonp(`${CENSUS_GEOCODER_URL}?${params}`);
+  const matches = ((data.result && data.result.addressMatches) || []).slice(0, limit);
+  return matches.map(m => ({
+    matched: m.matchedAddress,
+    street:  (m.matchedAddress || '').split(',')[0] || m.matchedAddress,
+    zip:     (m.addressComponents && m.addressComponents.zip) || '',
+    lat:     m.coordinates && m.coordinates.y,
+    lng:     m.coordinates && m.coordinates.x,
+  })).filter(m => m.lat != null && m.lng != null);
+}
+
+// Polyfill: Leaflet 1.7+ removed L.DomEvent.fakeStop, but Leaflet.VectorGrid
+// 1.3.0 still calls it on feature click — without this, clicks throw silently.
+if (L.DomEvent && !L.DomEvent.fakeStop) {
+  L.DomEvent.fakeStop = function (e) {
+    L.DomEvent.preventDefault(e);
+    L.DomEvent.stopPropagation(e);
+  };
+}
+
 // ── Map ──────────────────────────────────────────────────────
 
 function initMap() {
@@ -177,10 +235,8 @@ function clearMarker() {
 // ── Summary card ─────────────────────────────────────────────
 
 function populateSummary(tileProps) {
-  const address = tileProps.address ? titleCase(tileProps.address) : '—';
-
-  el('summaryAddress').textContent = address;
-  el('summaryPid').textContent     = 'Property ID: ' + (tileProps.property_id != null ? tileProps.property_id : '—');
+  el('summaryPid').textContent =
+    'Property ID: ' + (tileProps.property_id != null ? tileProps.property_id : '—');
 
   const assessed = Number(tileProps.predicted_value);
   const market   = Number(tileProps.market_value);
@@ -204,6 +260,125 @@ function populateSummary(tileProps) {
   }
 }
 
+// ── Address search (Census geocoder) ─────────────────────────
+
+function showSearchError(msg) {
+  const div = el('searchError');
+  div.textContent   = msg;
+  div.style.display = 'block';
+}
+
+function clearSearchError() {
+  const div = el('searchError');
+  div.textContent   = '';
+  div.style.display = 'none';
+}
+
+function setSearchLoading(loading) {
+  const btn = el('searchBtn');
+  btn.textContent = loading ? 'Searching…' : 'Search';
+  btn.disabled    = loading;
+}
+
+function flyToGeocodeResult(match) {
+  if (widgetMarker) widgetMarker.remove();
+  widgetMarker = L.marker([match.lat, match.lng])
+    .bindPopup(
+      `<div class="map-popup-address">${escHtml(titleCase(match.street))}</div>` +
+      `<div class="map-popup-value">Click the property to see values</div>`,
+      { maxWidth: 260 }
+    )
+    .addTo(widgetMap)
+    .openPopup();
+  widgetMap.flyTo([match.lat, match.lng], ADDRESS_ZOOM, { duration: 0.8 });
+  el('clearMarkerBtn').style.display = 'inline-block';
+}
+
+// Search button / Enter key
+async function lookupAddress() {
+  const query = el('propertySearch').value.trim();
+  if (!query) return;
+
+  clearSearchError();
+  setSearchLoading(true);
+  try {
+    const matches = await censusGeocode(query, 1);
+    if (!matches.length) {
+      showSearchError('No address match found. Try a more complete address (e.g. "1500 Market St").');
+      return;
+    }
+    flyToGeocodeResult(matches[0]);
+  } catch (err) {
+    console.error('[widget] geocode failed:', err);
+    showSearchError('Address lookup failed. Please try again.');
+  } finally {
+    setSearchLoading(false);
+  }
+}
+
+function setupAutocomplete() {
+  const input    = el('propertySearch');
+  const wrap     = input.closest('.search-input-wrap');
+  const dropdown = document.createElement('ul');
+  dropdown.className = 'autocomplete-list';
+  wrap.appendChild(dropdown);
+
+  let currentResults = [];
+
+  function closeDropdown() {
+    dropdown.classList.remove('open');
+    dropdown.innerHTML = '';
+    currentResults = [];
+  }
+
+  const suggest = debounce(async (query) => {
+    if (query.length < 4) { closeDropdown(); return; }
+
+    dropdown.innerHTML = '<li class="autocomplete-status">Searching…</li>';
+    dropdown.classList.add('open');
+
+    try {
+      const results = await censusGeocode(query, 8);
+      currentResults = results;
+
+      if (!results.length) {
+        dropdown.innerHTML = '<li class="autocomplete-status">No addresses found.</li>';
+        return;
+      }
+
+      dropdown.innerHTML = results.map((m, i) => `
+        <li class="autocomplete-item" data-idx="${i}" tabindex="0">
+          <span class="autocomplete-item-addr">${escHtml(titleCase(m.street))}</span>
+          <span class="autocomplete-item-zip">${escHtml(m.zip || '')}</span>
+        </li>`).join('');
+
+      dropdown.querySelectorAll('.autocomplete-item').forEach(li => {
+        li.addEventListener('mousedown', e => {
+          e.preventDefault(); // keep input focus until selection runs
+          const match = currentResults[parseInt(li.dataset.idx, 10)];
+          input.value = titleCase(match.street);
+          closeDropdown();
+          clearSearchError();
+          flyToGeocodeResult(match);
+        });
+      });
+    } catch (err) {
+      console.error('[widget] autocomplete failed:', err);
+      dropdown.innerHTML = '<li class="autocomplete-status">Error loading suggestions.</li>';
+    }
+  }, 320);
+
+  input.addEventListener('input',  () => suggest(input.value.trim()));
+  input.addEventListener('blur',   () => setTimeout(closeDropdown, 150));
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeDropdown();
+    if (e.key === 'Enter')  { closeDropdown(); lookupAddress(); }
+  });
+}
+
 // ── Init ─────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', initMap);
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  setupAutocomplete();
+});

@@ -35,7 +35,15 @@
   <!-- HERO -->
   <div class="hero-search">
     <h2>Property Assessment Lookup</h2>
-    <p>Click any property on the map below to view its predicted assessed value and current market value.</p>
+    <p>Search a Philadelphia address to fly the map there, or click any property to see its values.</p>
+    <div class="hero-search-bar">
+      <div class="search-input-wrap">
+        <input type="search" id="propertySearch" placeholder="Enter a Philadelphia address (e.g. 1500 Market St)" autocomplete="off" />
+      </div>
+      <button id="searchBtn" type="button" onclick="lookupAddress()">Search</button>
+    </div>
+    <div id="searchError" class="hero-error" style="display:none"></div>
+    <div class="hero-hint">After locating the address, click the property polygon to view its values.</div>
   </div>
 
   <!-- PAGE BODY -->
@@ -57,7 +65,6 @@
 
         <div class="summary-card">
           <div class="summary-header">
-            <div id="summaryAddress" class="summary-address">—</div>
             <div id="summaryPid" class="summary-pid">Property ID: —</div>
           </div>
           <div class="summary-body">
