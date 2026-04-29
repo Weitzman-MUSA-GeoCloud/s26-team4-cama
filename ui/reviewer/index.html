@@ -228,15 +228,12 @@
 
             <div class="overview-chart-block">
               <div class="overview-chart-header">
-                <span class="overview-chart-title">Current − Predicted Value</span>
-                <span class="overview-chart-legend-inline">
-                  <span class="pred-legend-dot" style="background:#f03b20"></span>Under-predicted
-                  <span class="pred-legend-dot" style="background:#0f4d90; margin-left:0.5rem"></span>Over-predicted
-                </span>
+                <span class="overview-chart-title">Predicted Market Value (ML Model)</span>
               </div>
               <div class="overview-chart-area" id="ovPredChart">
                 <span class="overview-no-data" id="ovPredMsg">Loading…</span>
               </div>
+              <p class="pred-chart-note">Values below $0 are statistical artifacts of the linear regression model for properties with atypical characteristics, and do not represent real valuations.</p>
             </div>
           </div>
 
